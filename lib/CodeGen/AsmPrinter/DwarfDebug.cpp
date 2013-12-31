@@ -2440,9 +2440,9 @@ void DwarfDebug::emitDebugLoc() {
       Asm->OutStreamer.EmitIntValue(0, Size);
       Asm->OutStreamer.EmitLabel(Asm->GetTempSymbol("debug_loc", index));
     } else {
-      Asm->OutStreamer.EmitSymbolValue(Entry.Begin, Size);
-      Asm->OutStreamer.EmitSymbolValue(Entry.End, Size);
-      DIVariable DV(Entry.Variable);
+      Asm->OutStreamer.EmitSymbolValue(Entry.getBeginSym(), Size);
+      Asm->OutStreamer.EmitSymbolValue(Entry.getEndSym(), Size);
+      DIVariable DV(Entry.getVariable());
       Asm->OutStreamer.AddComment("Loc expr size");
       MCSymbol *begin = Asm->OutStreamer.getContext().CreateTempSymbol();
       MCSymbol *end = Asm->OutStreamer.getContext().CreateTempSymbol();
@@ -2462,17 +2462,18 @@ void DwarfDebug::emitDebugLoc() {
           Asm->EmitULEB128(Entry.getInt());
         }
       } else if (Entry.isLocation()) {
+        MachineLocation Loc = Entry.getLoc();
         if (!DV.hasComplexAddress())
           // Regular entry.
-          Asm->EmitDwarfRegOp(Entry.Loc, DV.isIndirect());
+          Asm->EmitDwarfRegOp(Loc, DV.isIndirect());
         else {
           // Complex address entry.
           unsigned N = DV.getNumAddrElements();
           unsigned i = 0;
           if (N >= 2 && DV.getAddrElement(0) == DIBuilder::OpPlus) {
-            if (Entry.Loc.getOffset()) {
+            if (Loc.getOffset()) {
               i = 2;
-              Asm->EmitDwarfRegOp(Entry.Loc, DV.isIndirect());
+              Asm->EmitDwarfRegOp(Loc, DV.isIndirect());
               Asm->OutStreamer.AddComment("DW_OP_deref");
               Asm->EmitInt8(dwarf::DW_OP_deref);
               Asm->OutStreamer.AddComment("DW_OP_plus_uconst");
@@ -2481,12 +2482,12 @@ void DwarfDebug::emitDebugLoc() {
             } else {
               // If first address element is OpPlus then emit
               // DW_OP_breg + Offset instead of DW_OP_reg + Offset.
-              MachineLocation Loc(Entry.Loc.getReg(), DV.getAddrElement(1));
-              Asm->EmitDwarfRegOp(Loc, DV.isIndirect());
+              MachineLocation TLoc(Loc.getReg(), DV.getAddrElement(1));
+              Asm->EmitDwarfRegOp(TLoc, DV.isIndirect());
               i = 2;
             }
           } else {
-            Asm->EmitDwarfRegOp(Entry.Loc, DV.isIndirect());
+            Asm->EmitDwarfRegOp(Loc, DV.isIndirect());
           }
 
           // Emit remaining complex address elements.
@@ -2496,7 +2497,7 @@ void DwarfDebug::emitDebugLoc() {
               Asm->EmitInt8(dwarf::DW_OP_plus_uconst);
               Asm->EmitULEB128(DV.getAddrElement(++i));
             } else if (Element == DIBuilder::OpDeref) {
-              if (!Entry.Loc.isReg())
+              if (!Loc.isReg())
                 Asm->EmitInt8(dwarf::DW_OP_deref);
             } else
               llvm_unreachable("unknown Opcode found in complex address");

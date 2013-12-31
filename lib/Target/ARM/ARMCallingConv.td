@@ -209,12 +209,6 @@ def CSR_iOS : CalleeSavedRegs<(add LR, R7, R6, R5, R4, (sub CSR_AAPCS, R9))>;
 def CSR_iOS_ThisReturn : CalleeSavedRegs<(add LR, R7, R6, R5, R4,
                                           (sub CSR_AAPCS_ThisReturn, R9))>;
 
-// GHC set of callee saved regs is empty as all those regs are
-// used for passing STG regs around
-// add is a workaround for not being able to compile empty list:
-// def CSR_GHC : CalleeSavedRegs<()>;
-def CSR_GHC : CalleeSavedRegs<(add)>;
-
 // @LOCALMOD-START
 // NaCl does not save R9, but otherwise uses the same order as AAPCS
 def CSR_NaCl : CalleeSavedRegs<(add LR, R11, R10, R8, R7, R6, R5, R4,
