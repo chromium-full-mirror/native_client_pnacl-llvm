@@ -147,7 +147,7 @@ DIType DbgVariable::getType() const {
        the pointers and __Block_byref_x_VarName struct to find the actual
        value of the variable.  The function addBlockByrefType does this.  */
     DIType subType = Ty;
-    unsigned tag = Ty.getTag();
+    uint16_t tag = Ty.getTag();
 
     if (tag == dwarf::DW_TAG_pointer_type) {
       DIDerivedType DTy = DIDerivedType(Ty);
@@ -392,7 +392,7 @@ DIE *DwarfDebug::updateSubprogramScopeDIE(CompileUnit *SPCU,
         // Add arguments.
         DICompositeType SPTy = SP.getType();
         DIArray Args = SPTy.getTypeArray();
-        unsigned SPTag = SPTy.getTag();
+        uint16_t SPTag = SPTy.getTag();
         if (SPTag == dwarf::DW_TAG_subroutine_type)
           for (unsigned i = 1, N = Args.getNumElements(); i < N; ++i) {
             DIE *Arg = new DIE(dwarf::DW_TAG_formal_parameter);
@@ -2167,8 +2167,8 @@ void DwarfUnits::emitUnits(DwarfDebug *DD,
 unsigned DwarfUnits::getCUOffset(DIE *Die) {
   assert(Die->getTag() == dwarf::DW_TAG_compile_unit  &&
          "Input DIE should be compile unit in getCUOffset.");
-  for (SmallVectorImpl<CompileUnit *>::iterator I = CUs.begin(),
-       E = CUs.end(); I != E; ++I) {
+  for (SmallVectorImpl<CompileUnit *>::iterator I = CUs.begin(), E = CUs.end();
+       I != E; ++I) {
     CompileUnit *TheCU = *I;
     if (TheCU->getCUDie() == Die)
       return TheCU->getDebugInfoOffset();

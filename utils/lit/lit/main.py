@@ -297,7 +297,7 @@ def main(builtinParameters = {}):
             if t.suite not in suitesAndTests:
                 suitesAndTests[t.suite] = []
             suitesAndTests[t.suite].append(t)
-        suitesAndTests = suitesAndTests.items()
+        suitesAndTests = list(suitesAndTests.items())
         suitesAndTests.sort(key = lambda item: item[0].name)
 
         # Show the suites, if requested.
@@ -400,9 +400,10 @@ def main(builtinParameters = {}):
         if t.result.isFailure:
             hasFailures = True
 
-    # FIXME: Show unresolved and (optionally) unsupported tests.
+    # Print each test in any of the failing groups.
     for title,code in (('Unexpected Passing Tests', lit.Test.XPASS),
-                       ('Failing Tests', lit.Test.FAIL)):
+                       ('Failing Tests', lit.Test.FAIL),
+                       ('Unresolved Tests', lit.Test.UNRESOLVED)):
         elts = byCode.get(code)
         if not elts:
             continue
