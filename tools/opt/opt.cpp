@@ -477,6 +477,8 @@ static void AddOptimizationPasses(PassManagerBase &MPM,FunctionPassManager &FPM,
   
   Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(MPM);
+
+  Builder.LoopVectorize = OptLevel > 1 && SizeLevel < 2;
 }
 
 static void AddStandardCompilePasses(PassManagerBase &PM) {
