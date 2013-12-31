@@ -267,6 +267,12 @@ public:
   bool isS16ImmX4() const { return Kind == Expression ||
                                    (Kind == Immediate && isInt<16>(getImm()) &&
                                     (getImm() & 3) == 0); }
+  bool isDirectBr() const { return Kind == Expression ||
+                                   (Kind == Immediate && isInt<26>(getImm()) &&
+                                    (getImm() & 3) == 0); }
+  bool isCondBr() const { return Kind == Expression ||
+                                 (Kind == Immediate && isInt<16>(getImm()) &&
+                                  (getImm() & 3) == 0); }
   bool isRegNumber() const { return Kind == Immediate && isUInt<5>(getImm()); }
   bool isCCRegNumber() const { return Kind == Immediate &&
                                       isUInt<3>(getImm()); }
@@ -351,6 +357,14 @@ public:
       Inst.addOperand(MCOperand::CreateExpr(getExpr()));
   }
 
+  void addBranchTargetOperands(MCInst &Inst, unsigned N) const {
+    assert(N == 1 && "Invalid number of operands!");
+    if (Kind == Immediate)
+      Inst.addOperand(MCOperand::CreateImm(getImm() / 4));
+    else
+      Inst.addOperand(MCOperand::CreateExpr(getExpr()));
+  }
+
   StringRef getToken() const {
     assert(Kind == Token && "Invalid access!");
     return StringRef(Tok.Data, Tok.Length);
@@ -409,6 +423,15 @@ void PPCAsmParser::
 ProcessInstruction(MCInst &Inst,
                    const SmallVectorImpl<MCParsedAsmOperand*> &Operands) {
   switch (Inst.getOpcode()) {
+  case PPC::LAx: {
+    MCInst TmpInst;
+    TmpInst.setOpcode(PPC::LA);
+    TmpInst.addOperand(Inst.getOperand(0));
+    TmpInst.addOperand(Inst.getOperand(2));
+    TmpInst.addOperand(Inst.getOperand(1));
+    Inst = TmpInst;
+    break;
+  }
   case PPC::SLWI: {
     MCInst TmpInst;
     int64_t N = Inst.getOperand(2).getImm();
@@ -733,6 +756,22 @@ bool PPCAsmParser::
 ParseInstruction(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc,
                  SmallVectorImpl<MCParsedAsmOperand*> &Operands) {
   // The first operand is the token for the instruction name.
+  // If the next character is a '+' or '-', we need to add it to the
+  // instruction name, to match what TableGen is doing.
+  if (getLexer().is(AsmToken::Plus)) {
+    getLexer().Lex();
+    char *NewOpcode = new char[Name.size() + 1];
+    memcpy(NewOpcode, Name.data(), Name.size());
+    NewOpcode[Name.size()] = '+';
+    Name = StringRef(NewOpcode, Name.size() + 1);
+  }
+  if (getLexer().is(AsmToken::Minus)) {
+    getLexer().Lex();
+    char *NewOpcode = new char[Name.size() + 1];
+    memcpy(NewOpcode, Name.data(), Name.size());
+    NewOpcode[Name.size()] = '-';
+    Name = StringRef(NewOpcode, Name.size() + 1);
+  }
   // If the instruction ends in a '.', we need to create a separate
   // token for it, to match what TableGen is doing.
   size_t Dot = Name.find('.');
