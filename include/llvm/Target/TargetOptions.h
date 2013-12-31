@@ -214,8 +214,8 @@ namespace llvm {
 // Comparison operators:
 
 
-static inline bool operator==(const TargetOptions &LHS,
-                              const TargetOptions &RHS) {
+inline bool operator==(const TargetOptions &LHS,
+                       const TargetOptions &RHS) {
 #define ARE_EQUAL(X) LHS.X == RHS.X
   return
     ARE_EQUAL(UnsafeFPMath) &&
@@ -241,8 +241,8 @@ static inline bool operator==(const TargetOptions &LHS,
 #undef ARE_EQUAL
 }
 
-static inline bool operator!=(const TargetOptions &LHS,
-                              const TargetOptions &RHS) {
+inline bool operator!=(const TargetOptions &LHS,
+                       const TargetOptions &RHS) {
   return !(LHS == RHS);
 }
 
