@@ -101,12 +101,12 @@ SplitDwarf("split-dwarf", cl::Hidden,
            cl::init(Default));
 
 static cl::opt<DefaultOnOff>
-DwarfPubNames("generate-dwarf-pubnames", cl::Hidden,
-              cl::desc("Generate DWARF pubnames section"),
-              cl::values(clEnumVal(Default, "Default for platform"),
-                         clEnumVal(Enable, "Enabled"),
-                         clEnumVal(Disable, "Disabled"), clEnumValEnd),
-              cl::init(Default));
+DwarfPubSections("generate-dwarf-pub-sections", cl::Hidden,
+                 cl::desc("Generate DWARF pubnames and pubtypes sections"),
+                 cl::values(clEnumVal(Default, "Default for platform"),
+                            clEnumVal(Enable, "Enabled"),
+                            clEnumVal(Disable, "Disabled"), clEnumValEnd),
+                 cl::init(Default));
 
 static const char *const DWARFGroupName = "DWARF Emission";
 static const char *const DbgTimerName = "DWARF Debug Writer";
@@ -210,17 +210,17 @@ DwarfDebug::DwarfDebug(AsmPrinter *A, Module *M)
   if (DwarfAccelTables == Default)
     HasDwarfAccelTables = IsDarwin;
   else
-    HasDwarfAccelTables = DwarfAccelTables = Enable;
+    HasDwarfAccelTables = DwarfAccelTables == Enable;
 
   if (SplitDwarf == Default)
     HasSplitDwarf = false;
   else
     HasSplitDwarf = SplitDwarf == Enable;
 
-  if (DwarfPubNames == Default)
-    HasDwarfPubNames = !IsDarwin;
+  if (DwarfPubSections == Default)
+    HasDwarfPubSections = !IsDarwin;
   else
-    HasDwarfPubNames = DwarfPubNames == Enable;
+    HasDwarfPubSections = DwarfPubSections == Enable;
 
   DwarfVersion = getDwarfVersionFromModule(MMI->getModule());
 
@@ -696,9 +696,8 @@ CompileUnit *DwarfDebug::constructCompileUnit(const MDNode *N) {
   CompilationDir = DIUnit.getDirectory();
 
   DIE *Die = new DIE(dwarf::DW_TAG_compile_unit);
-  CompileUnit *NewCU = new CompileUnit(GlobalCUIndexCount++,
-                                       DIUnit.getLanguage(), Die, N, Asm,
-                                       this, &InfoHolder);
+  CompileUnit *NewCU =
+      new CompileUnit(GlobalCUIndexCount++, Die, N, Asm, this, &InfoHolder);
 
   FileIDCUMap[NewCU->getUniqueID()] = 0;
   // Call this to emit a .file directive if it wasn't emitted for the source
@@ -792,7 +791,7 @@ void DwarfDebug::constructSubprogramDIE(CompileUnit *TheCU,
   TheCU->addToContextOwner(SubprogramDie, SP.getContext());
 
   // Expose as global, if requested.
-  if (HasDwarfPubNames)
+  if (HasDwarfPubSections)
     TheCU->addGlobalName(SP.getName(), SubprogramDie);
 }
 
@@ -1033,7 +1032,7 @@ void DwarfDebug::finalizeModuleInfo() {
       TheCU->addUInt(TheCU->getCUDie(), dwarf::DW_AT_GNU_dwo_id,
                      dwarf::DW_FORM_data8, ID);
       // Now construct the skeleton CU associated.
-      CompileUnit *SkCU = constructSkeletonCU(CUI->first);
+      CompileUnit *SkCU = constructSkeletonCU(TheCU);
       // This should be a unique identifier when we want to build .dwp files.
       SkCU->addUInt(SkCU->getCUDie(), dwarf::DW_AT_GNU_dwo_id,
                     dwarf::DW_FORM_data8, ID);
@@ -1141,13 +1140,13 @@ void DwarfDebug::endModule() {
   }
 
   // Emit info into a debug pubnames section, if requested.
-  if (HasDwarfPubNames)
+  if (HasDwarfPubSections)
     emitDebugPubnames();
 
   // Emit info into a debug pubtypes section.
   // TODO: When we don't need the option anymore we can
   // remove all of the code that adds to the table.
-  if (useDarwinGDBCompat())
+  if (useDarwinGDBCompat() || HasDwarfPubSections)
     emitDebugPubTypes();
 
   // Finally emit string information into a string table.
@@ -1927,9 +1926,10 @@ void DwarfDebug::emitSectionLabels() {
   DwarfLineSectionSym =
     emitSectionSym(Asm, TLOF.getDwarfLineSection(), "section_line");
   emitSectionSym(Asm, TLOF.getDwarfLocSection());
-  if (HasDwarfPubNames)
+  if (HasDwarfPubSections)
     emitSectionSym(Asm, TLOF.getDwarfPubNamesSection());
-  emitSectionSym(Asm, TLOF.getDwarfPubTypesSection());
+  if (useDarwinGDBCompat() || HasDwarfPubSections)
+    emitSectionSym(Asm, TLOF.getDwarfPubTypesSection());
   DwarfStrSectionSym =
     emitSectionSym(Asm, TLOF.getDwarfStrSection(), "info_string");
   if (useSplitDwarf()) {
@@ -2685,17 +2685,14 @@ void DwarfDebug::emitDebugInlineInfo() {
 // DW_AT_low_pc, DW_AT_high_pc, DW_AT_ranges, DW_AT_dwo_name, DW_AT_dwo_id,
 // DW_AT_ranges_base, DW_AT_addr_base. If DW_AT_ranges is present,
 // DW_AT_low_pc and DW_AT_high_pc are not used, and vice versa.
-CompileUnit *DwarfDebug::constructSkeletonCU(const MDNode *N) {
-  DICompileUnit DIUnit(N);
-  CompilationDir = DIUnit.getDirectory();
+CompileUnit *DwarfDebug::constructSkeletonCU(const CompileUnit *CU) {
 
   DIE *Die = new DIE(dwarf::DW_TAG_compile_unit);
-  CompileUnit *NewCU = new CompileUnit(GlobalCUIndexCount++,
-                                       DIUnit.getLanguage(), Die, N, Asm,
-                                       this, &SkeletonHolder);
+  CompileUnit *NewCU = new CompileUnit(CU->getUniqueID(), Die, CU->getNode(),
+                                       Asm, this, &SkeletonHolder);
 
   NewCU->addLocalString(Die, dwarf::DW_AT_GNU_dwo_name,
-                        DIUnit.getSplitDebugFilename());
+                        DICompileUnit(CU->getNode()).getSplitDebugFilename());
 
   // Relocate to the beginning of the addr_base section, else 0 for the
   // beginning of the one for this compile unit.
