@@ -471,7 +471,6 @@ static void AddOptimizationPasses(PassManagerBase &MPM,FunctionPassManager &FPM,
   }
   Builder.DisableUnitAtATime = !UnitAtATime;
   Builder.DisableUnrollLoops = OptLevel == 0;
-  Builder.DisableSimplifyLibCalls = DisableSimplifyLibCalls;
   
   Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(MPM);
@@ -491,7 +490,6 @@ static void AddStandardCompilePasses(PassManagerBase &PM) {
   if (!DisableInline)
     Builder.Inliner = createFunctionInliningPass();
   Builder.OptLevel = 3;
-  Builder.DisableSimplifyLibCalls = DisableSimplifyLibCalls;
   Builder.populateModulePassManager(PM);
 }
 
