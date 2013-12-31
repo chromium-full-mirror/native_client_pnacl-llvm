@@ -622,6 +622,7 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
 
     DEBUG(dbgs() << "Optimized type-legalized selection DAG: BB#" << BlockNumber
           << " '" << BlockName << "'\n"; CurDAG->dump());
+
   }
 
   {
@@ -782,9 +783,6 @@ void SelectionDAGISel::DoInstructionSelection() {
         continue;
       // Replace node.
       if (ResNode) {
-        // Propagate ordering
-        CurDAG->AssignOrdering(ResNode, CurDAG->GetOrdering(Node));
-
         ReplaceUses(Node, ResNode);
       }
 
