@@ -189,6 +189,8 @@ namespace llvm {
       // Floating-point max and min:
       FMAX,
       FMIN,
+      VMAXNM,
+      VMINNM,
 
       // Bit-field insert
       BFI,
