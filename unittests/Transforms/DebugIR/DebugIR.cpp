@@ -32,6 +32,14 @@
 
 #include "gtest/gtest.h"
 
+#if defined(LLVM_ON_WIN32)
+#include <direct.h>
+#define getcwd_impl _getcwd
+#elif defined (HAVE_GETCWD)
+#include <unistd.h>
+#define getcwd_impl getcwd
+#endif // LLVM_ON_WIN32
+
 using namespace llvm;
 using namespace std;
 
@@ -53,19 +61,21 @@ bool removeIfExists(StringRef Path) {
   return existed;
 }
 
+char * current_dir() {
+#if defined(LLVM_ON_WIN32) || defined(HAVE_GETCWD)
+  // calling getcwd (or _getcwd() on windows) with a null buffer makes it
+  // allocate a sufficiently sized buffer to store the current working dir.
+  return getcwd_impl(0, 0);
+#else
+  return 0;
+#endif
+}
+
 class TestDebugIR : public ::testing::Test, public TrivialModuleBuilder {
 protected:
   TestDebugIR()
       : TrivialModuleBuilder(sys::getProcessTriple())
-#ifdef HAVE_GETCWD
-        ,
-        cwd(get_current_dir_name())
-#else
-        ,
-        cwd(0)
-#endif
-        {
-  }
+      , cwd(current_dir()) {}
 
   ~TestDebugIR() { free(cwd); }
 
@@ -86,14 +96,15 @@ protected:
 
 // Test empty named Module that is not supposed to be output to disk.
 TEST_F(TestDebugIR, EmptyNamedModuleNoWrite) {
-  string name = "/mock/path/to/empty_module.ll";
-  M.reset(createEmptyModule(name));
-  D.reset(static_cast<DebugIR *>(llvm::createDebugIRPass()));
-  string Path;
-  D->runOnModule(*M, Path);
+  string Dir = "MadeUpDirectory";
+  string File = "empty_module.ll";
+  string Path(getPath(Dir, File));
 
-  // verify DebugIR was able to correctly parse the file name from module ID
-  ASSERT_EQ(Path, name);
+  M.reset(createEmptyModule(Path));
+
+  // constructing DebugIR with no args should not result in any file generated.
+  D.reset(static_cast<DebugIR *>(llvm::createDebugIRPass()));
+  D->runOnModule(*M);
 
   // verify DebugIR did not generate a file
   ASSERT_FALSE(removeIfExists(Path)) << "Unexpected file " << Path;
