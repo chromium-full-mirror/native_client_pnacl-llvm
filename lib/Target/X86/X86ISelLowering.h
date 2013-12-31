@@ -284,7 +284,7 @@ namespace llvm {
 
       // PCMP* - Vector integer comparisons.
       PCMPEQ, PCMPGT,
-      // PCMP*M - Vector integer comparisons, the result is in a mask vector
+      // PCMP*M - Vector integer comparisons, the result is in a mask vector.
       PCMPEQM, PCMPGTM,
 
       /// CMPM, CMPMU - Vector comparison generating mask bits for fp and
@@ -305,11 +305,14 @@ namespace llvm {
       // MUL_IMM - X86 specific multiply by immediate.
       MUL_IMM,
 
-      // PTEST - Vector bitwise comparisons
+      // PTEST - Vector bitwise comparisons.
       PTEST,
 
-      // TESTP - Vector packed fp sign bitwise comparisons
+      // TESTP - Vector packed fp sign bitwise comparisons.
       TESTP,
+
+      // TESTM - Vector "test" in AVX-512, the result is in a mask vector.
+      TESTM,
 
       // OR/AND test for masks
       KORTEST,
