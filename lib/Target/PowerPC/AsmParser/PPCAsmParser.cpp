@@ -546,7 +546,7 @@ ParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) {
 }
 
 /// Extract @l/@ha modifier from expression.  Recursively scan
-/// the expression and check for VK_PPC_ADDR16_HA/VK_PPC_ADDR16_LO
+/// the expression and check for VK_PPC_LO/HI/HA
 /// symbol variants.  If all symbols with modifier use the same
 /// variant, return the corresponding PPCMCExpr::VariantKind,
 /// and a modified expression using the default symbol variant.
@@ -566,11 +566,14 @@ ExtractModifierFromExpr(const MCExpr *E,
     const MCSymbolRefExpr *SRE = cast<MCSymbolRefExpr>(E);
 
     switch (SRE->getKind()) {
-    case MCSymbolRefExpr::VK_PPC_ADDR16_HA:
-      Variant = PPCMCExpr::VK_PPC_HA16;
+    case MCSymbolRefExpr::VK_PPC_LO:
+      Variant = PPCMCExpr::VK_PPC_LO;
       break;
-    case MCSymbolRefExpr::VK_PPC_ADDR16_LO:
-      Variant = PPCMCExpr::VK_PPC_LO16;
+    case MCSymbolRefExpr::VK_PPC_HI:
+      Variant = PPCMCExpr::VK_PPC_HI;
+      break;
+    case MCSymbolRefExpr::VK_PPC_HA:
+      Variant = PPCMCExpr::VK_PPC_HA;
       break;
     default:
       return 0;

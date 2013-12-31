@@ -168,9 +168,37 @@ public:
 };
 } // end anonymous namespace
 
-// FIXME: This function is hideous. The hideous ELF type names are hideous.
-// Factor the ELF output into a class (templated on ELFT) and share some
-// typedefs.
+// FIXME: At this point it is fairly clear that we need to refactor these
+// static functions into methods of a class sharing some typedefs. These
+// ELF type names are insane.
+template <class ELFT>
+static void
+addSymbols(const std::vector<ELFYAML::Symbol> &Symbols, ELFState<ELFT> &State,
+           std::vector<typename object::ELFObjectFile<ELFT>::Elf_Sym> &Syms,
+           unsigned SymbolBinding) {
+  typedef typename object::ELFObjectFile<ELFT>::Elf_Sym Elf_Sym;
+  for (unsigned i = 0, e = Symbols.size(); i != e; ++i) {
+    const ELFYAML::Symbol &Sym = Symbols[i];
+    Elf_Sym Symbol;
+    zero(Symbol);
+    if (!Sym.Name.empty())
+      Symbol.st_name = State.getStringTable().addString(Sym.Name);
+    Symbol.setBindingAndType(SymbolBinding, Sym.Type);
+    if (!Sym.Section.empty()) {
+      unsigned Index;
+      if (State.getSN2I().lookupSection(Sym.Section, Index)) {
+        errs() << "error: Unknown section referenced: '" << Sym.Section
+               << "' by YAML symbol " << Sym.Name << ".\n";
+        exit(1);
+      }
+      Symbol.st_shndx = Index;
+    } // else Symbol.st_shndex == SHN_UNDEF (== 0), since it was zero'd earlier.
+    Symbol.st_value = Sym.Value;
+    Symbol.st_size = Sym.Size;
+    Syms.push_back(Symbol);
+  }
+}
+
 template <class ELFT>
 static void handleSymtabSectionHeader(
     const ELFYAML::Section &Sec, ELFState<ELFT> &State,
@@ -180,9 +208,8 @@ static void handleSymtabSectionHeader(
   // TODO: Ensure that a manually specified `Link` field is diagnosed as an
   // error for SHT_SYMTAB.
   SHeader.sh_link = State.getDotStrTabSecNo();
-  // TODO: Once we handle symbol binding, this should be one greater than
-  // symbol table index of the last local symbol.
-  SHeader.sh_info = 0;
+  // One greater than symbol table index of the last local symbol.
+  SHeader.sh_info = Sec.Symbols.Local.size() + 1;
   SHeader.sh_entsize = sizeof(Elf_Sym);
 
   std::vector<Elf_Sym> Syms;
@@ -192,24 +219,9 @@ static void handleSymtabSectionHeader(
     zero(Sym);
     Syms.push_back(Sym);
   }
-  for (unsigned i = 0, e = Sec.Symbols.size(); i != e; ++i) {
-    const ELFYAML::Symbol &Sym = Sec.Symbols[i];
-    Elf_Sym Symbol;
-    zero(Symbol);
-    if (!Sym.Name.empty())
-      Symbol.st_name = State.getStringTable().addString(Sym.Name);
-    Symbol.setBindingAndType(Sym.Binding, Sym.Type);
-    unsigned Index;
-    if (State.getSN2I().lookupSection(Sym.Section, Index)) {
-      errs() << "error: Unknown section referenced: '" << Sym.Section
-             << "' by YAML symbol " << Sym.Name << ".\n";
-      exit(1);
-    }
-    Symbol.st_shndx = Index;
-    Symbol.st_value = Sym.Value;
-    Symbol.st_size = Sym.Size;
-    Syms.push_back(Symbol);
-  }
+  addSymbols(Sec.Symbols.Local, State, Syms, ELF::STB_LOCAL);
+  addSymbols(Sec.Symbols.Global, State, Syms, ELF::STB_GLOBAL);
+  addSymbols(Sec.Symbols.Weak, State, Syms, ELF::STB_WEAK);
 
   ContiguousBlobAccumulator &CBA = State.getSectionContentAccum();
   SHeader.sh_offset = CBA.currentOffset();
