@@ -486,6 +486,9 @@ void X86Subtarget::initializeEnvironment() {
   HasBMI2 = false;
   HasRTM = false;
   HasHLE = false;
+  HasERI = false;
+  HasCDI = false;
+  HasPFI=false;
   HasADX = false;
   HasPRFCHW = false;
   HasRDSEED = false;
