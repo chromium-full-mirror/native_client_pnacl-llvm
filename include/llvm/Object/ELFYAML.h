@@ -36,18 +36,27 @@ LLVM_YAML_STRONG_TYPEDEF(uint16_t, ELF_ET)
 LLVM_YAML_STRONG_TYPEDEF(uint32_t, ELF_EM)
 LLVM_YAML_STRONG_TYPEDEF(uint8_t, ELF_ELFCLASS)
 LLVM_YAML_STRONG_TYPEDEF(uint8_t, ELF_ELFDATA)
+LLVM_YAML_STRONG_TYPEDEF(uint8_t, ELF_ELFOSABI)
 LLVM_YAML_STRONG_TYPEDEF(uint32_t, ELF_SHT)
 // Just use 64, since it can hold 32-bit values too.
 LLVM_YAML_STRONG_TYPEDEF(uint64_t, ELF_SHF)
+LLVM_YAML_STRONG_TYPEDEF(uint8_t, ELF_STB)
+LLVM_YAML_STRONG_TYPEDEF(uint8_t, ELF_STT)
 
 // For now, hardcode 64 bits everywhere that 32 or 64 would be needed
 // since 64-bit can hold 32-bit values too.
 struct FileHeader {
   ELF_ELFCLASS Class;
   ELF_ELFDATA Data;
+  ELF_ELFOSABI OSABI;
   ELF_ET Type;
   ELF_EM Machine;
   llvm::yaml::Hex64 Entry;
+};
+struct Symbol {
+  StringRef Name;
+  ELF_STB Binding;
+  ELF_STT Type;
 };
 struct Section {
   StringRef Name;
@@ -57,6 +66,8 @@ struct Section {
   object::yaml::BinaryRef Content;
   StringRef Link;
   llvm::yaml::Hex64 AddressAlign;
+  // For SHT_SYMTAB; should be empty otherwise.
+  std::vector<Symbol> Symbols;
 };
 struct Object {
   FileHeader Header;
@@ -67,6 +78,7 @@ struct Object {
 } // end namespace llvm
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::Section)
+LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::Symbol)
 
 namespace llvm {
 namespace yaml {
@@ -92,6 +104,11 @@ struct ScalarEnumerationTraits<ELFYAML::ELF_ELFDATA> {
 };
 
 template <>
+struct ScalarEnumerationTraits<ELFYAML::ELF_ELFOSABI> {
+  static void enumeration(IO &IO, ELFYAML::ELF_ELFOSABI &Value);
+};
+
+template <>
 struct ScalarEnumerationTraits<ELFYAML::ELF_SHT> {
   static void enumeration(IO &IO, ELFYAML::ELF_SHT &Value);
 };
@@ -102,8 +119,23 @@ struct ScalarBitSetTraits<ELFYAML::ELF_SHF> {
 };
 
 template <>
+struct ScalarEnumerationTraits<ELFYAML::ELF_STB> {
+  static void enumeration(IO &IO, ELFYAML::ELF_STB &Value);
+};
+
+template <>
+struct ScalarEnumerationTraits<ELFYAML::ELF_STT> {
+  static void enumeration(IO &IO, ELFYAML::ELF_STT &Value);
+};
+
+template <>
 struct MappingTraits<ELFYAML::FileHeader> {
   static void mapping(IO &IO, ELFYAML::FileHeader &FileHdr);
+};
+
+template <>
+struct MappingTraits<ELFYAML::Symbol> {
+  static void mapping(IO &IO, ELFYAML::Symbol &Symbol);
 };
 
 template <>
