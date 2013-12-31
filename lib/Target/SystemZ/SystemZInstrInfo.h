@@ -66,14 +66,18 @@ namespace SystemZII {
     // The type of the branch.
     BranchType Type;
 
+    // CCMASK_<N> is set if CC might be equal to N.
+    unsigned CCValid;
+
     // CCMASK_<N> is set if the branch should be taken when CC == N.
     unsigned CCMask;
 
     // The target of the branch.
     const MachineOperand *Target;
 
-    Branch(BranchType type, unsigned ccMask, const MachineOperand *target)
-      : Type(type), CCMask(ccMask), Target(target) {}
+    Branch(BranchType type, unsigned ccValid, unsigned ccMask,
+           const MachineOperand *target)
+      : Type(type), CCValid(ccValid), CCMask(ccMask), Target(target) {}
   };
 }
 
@@ -104,14 +108,6 @@ public:
                                 MachineBasicBlock *FBB,
                                 const SmallVectorImpl<MachineOperand> &Cond,
                                 DebugLoc DL) const LLVM_OVERRIDE;
-  virtual bool analyzeCompare(const MachineInstr *MI,
-                              unsigned &SrcReg, unsigned &SrcReg2,
-                              int &Mask, int &Value) const LLVM_OVERRIDE;
-  virtual bool optimizeCompareInstr(MachineInstr *CmpInstr,
-                                    unsigned SrcReg, unsigned SrcReg2,
-                                    int Mask, int Value,
-                                    const MachineRegisterInfo *MRI) const
-    LLVM_OVERRIDE;
   virtual bool isPredicable(MachineInstr *MI) const LLVM_OVERRIDE;
   virtual bool isProfitableToIfCvt(MachineBasicBlock &MBB, unsigned NumCycles,
                                    unsigned ExtraPredCycles,
