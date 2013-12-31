@@ -6781,6 +6781,115 @@ SDValue PPCTargetLowering::DAGCombineFastRecipFSQRT(SDValue Op,
   return SDValue();
 }
 
+// Like SelectionDAG::isConsecutiveLoad, but also works for stores, and does
+// not enforce equality of the chain operands.
+static bool isConsecutiveLS(LSBaseSDNode *LS, LSBaseSDNode *Base,
+                            unsigned Bytes, int Dist,
+                            SelectionDAG &DAG) {
+  EVT VT = LS->getMemoryVT();
+  if (VT.getSizeInBits() / 8 != Bytes)
+    return false;
+
+  SDValue Loc = LS->getBasePtr();
+  SDValue BaseLoc = Base->getBasePtr();
+  if (Loc.getOpcode() == ISD::FrameIndex) {
+    if (BaseLoc.getOpcode() != ISD::FrameIndex)
+      return false;
+    const MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
+    int FI  = cast<FrameIndexSDNode>(Loc)->getIndex();
+    int BFI = cast<FrameIndexSDNode>(BaseLoc)->getIndex();
+    int FS  = MFI->getObjectSize(FI);
+    int BFS = MFI->getObjectSize(BFI);
+    if (FS != BFS || FS != (int)Bytes) return false;
+    return MFI->getObjectOffset(FI) == (MFI->getObjectOffset(BFI) + Dist*Bytes);
+  }
+
+  // Handle X+C
+  if (DAG.isBaseWithConstantOffset(Loc) && Loc.getOperand(0) == BaseLoc &&
+      cast<ConstantSDNode>(Loc.getOperand(1))->getSExtValue() == Dist*Bytes)
+    return true;
+
+  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  const GlobalValue *GV1 = NULL;
+  const GlobalValue *GV2 = NULL;
+  int64_t Offset1 = 0;
+  int64_t Offset2 = 0;
+  bool isGA1 = TLI.isGAPlusOffset(Loc.getNode(), GV1, Offset1);
+  bool isGA2 = TLI.isGAPlusOffset(BaseLoc.getNode(), GV2, Offset2);
+  if (isGA1 && isGA2 && GV1 == GV2)
+    return Offset1 == (Offset2 + Dist*Bytes);
+  return false;
+}
+
+// Return true is there is a nearyby consecutive load to the one provided
+// (regardless of alignment). We search up and down the chain, looking though
+// token factors and other loads (but nothing else). As a result, a true
+// results indicates that it is safe to create a new consecutive load adjacent
+// to the load provided.
+static bool findConsecutiveLoad(LoadSDNode *LD, SelectionDAG &DAG) {
+  SDValue Chain = LD->getChain();
+  EVT VT = LD->getMemoryVT();
+
+  SmallSet<SDNode *, 16> LoadRoots;
+  SmallVector<SDNode *, 8> Queue(1, Chain.getNode());
+  SmallSet<SDNode *, 16> Visited;
+
+  // First, search up the chain, branching to follow all token-factor operands.
+  // If we find a consecutive load, then we're done, otherwise, record all
+  // nodes just above the top-level loads and token factors.
+  while (!Queue.empty()) {
+    SDNode *ChainNext = Queue.pop_back_val();
+    if (!Visited.insert(ChainNext))
+      continue;
+
+    if (LoadSDNode *ChainLD = dyn_cast<LoadSDNode>(ChainNext)) {
+      if (isConsecutiveLS(ChainLD, LD, VT.getStoreSize(), 1, DAG))
+        return true;
+
+      if (!Visited.count(ChainLD->getChain().getNode()))
+        Queue.push_back(ChainLD->getChain().getNode());
+    } else if (ChainNext->getOpcode() == ISD::TokenFactor) {
+      for (SDNode::op_iterator O = ChainNext->op_begin(),
+           OE = ChainNext->op_end(); O != OE; ++O)
+        if (!Visited.count(O->getNode()))
+          Queue.push_back(O->getNode());
+    } else
+      LoadRoots.insert(ChainNext);
+  }
+
+  // Second, search down the chain, starting from the top-level nodes recorded
+  // in the first phase. These top-level nodes are the nodes just above all
+  // loads and token factors. Starting with their uses, recursively look though
+  // all loads (just the chain uses) and token factors to find a consecutive
+  // load.
+  Visited.clear();
+  Queue.clear();
+
+  for (SmallSet<SDNode *, 16>::iterator I = LoadRoots.begin(),
+       IE = LoadRoots.end(); I != IE; ++I) {
+    Queue.push_back(*I);
+       
+    while (!Queue.empty()) {
+      SDNode *LoadRoot = Queue.pop_back_val();
+      if (!Visited.insert(LoadRoot))
+        continue;
+
+      if (LoadSDNode *ChainLD = dyn_cast<LoadSDNode>(LoadRoot))
+        if (isConsecutiveLS(ChainLD, LD, VT.getStoreSize(), 1, DAG))
+          return true;
+
+      for (SDNode::use_iterator UI = LoadRoot->use_begin(),
+           UE = LoadRoot->use_end(); UI != UE; ++UI)
+        if (((isa<LoadSDNode>(*UI) &&
+            cast<LoadSDNode>(*UI)->getChain().getNode() == LoadRoot) ||
+            UI->getOpcode() == ISD::TokenFactor) && !Visited.count(*UI))
+          Queue.push_back(*UI);
+    }
+  }
+
+  return false;
+}
+
 SDValue PPCTargetLowering::PerformDAGCombine(SDNode *N,
                                              DAGCombinerInfo &DCI) const {
   const TargetMachine &TM = getTargetMachine();
@@ -7015,12 +7124,19 @@ SDValue PPCTargetLowering::PerformDAGCombine(SDNode *N,
       // require the next load to appear to be aligned, even though it
       // is actually offset from the base pointer by a lesser amount.
       int IncOffset = VT.getSizeInBits() / 8;
-      int IncValue = IncOffset - 1;
+      int IncValue = IncOffset;
+
+      // Walk (both up and down) the chain looking for another load at the real
+      // (aligned) offset (the alignment of the other load does not matter in
+      // this case). If found, then do not use the offset reduction trick, as
+      // that will prevent the loads from being later combined (as they would
+      // otherwise be duplicates).
+      if (!findConsecutiveLoad(LD, DAG))
+        --IncValue;
+
       SDValue Increment = DAG.getConstant(IncValue, getPointerTy());
       Ptr = DAG.getNode(ISD::ADD, dl, Ptr.getValueType(), Ptr, Increment);
 
-      // FIXME: We might have another load (with a slightly-different
-      // real offset) that we can reuse here.
       SDValue ExtraLoad =
         DAG.getLoad(VT, dl, Chain, Ptr,
                     LD->getPointerInfo().getWithOffset(IncOffset),
