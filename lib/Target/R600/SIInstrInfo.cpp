@@ -172,7 +172,6 @@ SIInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 }
 
 unsigned SIInstrInfo::commuteOpcode(unsigned Opcode) const {
-
   int NewOpc;
 
   // Try to map original to commuted opcode
@@ -419,7 +418,7 @@ void SIInstrInfo::legalizeOpWithMove(MachineInstr *MI, unsigned OpIdx) const {
   if (MO.isReg()) {
     Opcode = AMDGPU::COPY;
   } else if (RI.isSGPRClass(RC)) {
-      Opcode = AMDGPU::S_MOV_B32;
+    Opcode = AMDGPU::S_MOV_B32;
   }
 
   unsigned Reg = MRI.createVirtualRegister(RI.getRegClass(RCID));
@@ -440,7 +439,9 @@ void SIInstrInfo::legalizeOperands(MachineInstr *MI) const {
   // Legalize VOP2
   if (isVOP2(MI->getOpcode()) && Src1Idx != -1) {
     MachineOperand &Src1 = MI->getOperand(Src1Idx);
-    // Legalize VOP2 instructions where src1 is not a VGPR.
+
+    // Legalize VOP2 instructions where src1 is not a VGPR. An SGPR input must
+    // be the first operand, and there can only be one.
     if (Src1.isImm() || Src1.isFPImm() ||
         (Src1.isReg() && RI.isSGPRClass(MRI.getRegClass(Src1.getReg())))) {
       if (MI->isCommutable()) {
