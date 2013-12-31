@@ -796,7 +796,7 @@ CompileUnit *DwarfDebug::constructCompileUnit(const MDNode *N) {
                                            NewCU->getUniqueID()));
       else
         NewCU->addDelta(Die, dwarf::DW_AT_GNU_pubtypes, dwarf::DW_FORM_data4,
-                        Asm->GetTempSymbol("gnu_pubnames",
+                        Asm->GetTempSymbol("gnu_pubtypes",
                                            NewCU->getUniqueID()),
                         DwarfGnuPubTypesSectionSym);
     }
@@ -2427,9 +2427,6 @@ void DwarfDebug::emitDebugPubNames(bool GnuStyle) {
     CompileUnit *TheCU = I->second;
     unsigned ID = TheCU->getUniqueID();
 
-    if (TheCU->getGlobalNames().empty())
-      continue;
-
     // Start the dwarf pubnames section.
     Asm->OutStreamer.SwitchSection(PSec);
 
@@ -2988,7 +2985,7 @@ CompileUnit *DwarfDebug::constructSkeletonCU(const CompileUnit *CU) {
                       Asm->GetTempSymbol("gnu_pubtypes", NewCU->getUniqueID()));
     else
       NewCU->addDelta(Die, dwarf::DW_AT_GNU_pubtypes, dwarf::DW_FORM_data4,
-                      Asm->GetTempSymbol("gnu_pubnames", NewCU->getUniqueID()),
+                      Asm->GetTempSymbol("gnu_pubtypes", NewCU->getUniqueID()),
                       DwarfGnuPubTypesSectionSym);
   }
 
