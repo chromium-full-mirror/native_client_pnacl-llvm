@@ -203,14 +203,13 @@ namespace {
       unsigned LongFormOpcode;
     public:
       bool NegOk;
-      bool IsSoImm;
       bool KnownAlignment;
       CPUser(MachineInstr *mi, MachineInstr *cpemi, unsigned maxdisp,
-             bool neg, bool soimm,
+             bool neg,
              unsigned longformmaxdisp, unsigned longformopcode)
         : MI(mi), CPEMI(cpemi), MaxDisp(maxdisp),
           LongFormMaxDisp(longformmaxdisp), LongFormOpcode(longformopcode),
-          NegOk(neg), IsSoImm(soimm), KnownAlignment(false)  {
+          NegOk(neg), KnownAlignment(false)  {
         HighWaterMark = CPEMI->getParent();
       }
       /// getMaxDisp - Returns the maximum displacement supported by MI.
@@ -318,7 +317,7 @@ namespace {
     void verify();
 
     bool isOffsetInRange(unsigned UserOffset, unsigned TrialOffset,
-                         unsigned Disp, bool NegativeOK, bool IsSoImm = false);
+                         unsigned Disp, bool NegativeOK);
     bool isOffsetInRange(unsigned UserOffset, unsigned TrialOffset,
                          const CPUser &U);
 
@@ -363,14 +362,14 @@ bool MipsConstantIslands::isLongFormOffsetInRange
   (unsigned UserOffset, unsigned TrialOffset,
    const CPUser &U) {
   return isOffsetInRange(UserOffset, TrialOffset,
-                         U.getLongFormMaxDisp(), U.NegOk, U.IsSoImm);
+                         U.getLongFormMaxDisp(), U.NegOk);
 }
 
 bool MipsConstantIslands::isOffsetInRange
   (unsigned UserOffset, unsigned TrialOffset,
    const CPUser &U) {
   return isOffsetInRange(UserOffset, TrialOffset,
-                         U.getMaxDisp(), U.NegOk, U.IsSoImm);
+                         U.getMaxDisp(), U.NegOk);
 }
 /// print block size and offset information - debugging
 void MipsConstantIslands::dumpBBs() {
@@ -664,7 +663,6 @@ initializeFunctionInfo(const std::vector<MachineInstr*> &CPEMIs) {
           unsigned Bits = 0;
           unsigned Scale = 1;
           bool NegOk = false;
-          bool IsSoImm = false;
           unsigned LongFormBits = 0;
           unsigned LongFormScale = 0;
           unsigned LongFormOpcode = 0;
@@ -687,8 +685,7 @@ initializeFunctionInfo(const std::vector<MachineInstr*> &CPEMIs) {
           unsigned MaxOffs = ((1 << Bits)-1) * Scale;
           unsigned LongFormMaxOffs = ((1 << LongFormBits)-1) * LongFormScale;
           CPUsers.push_back(CPUser(I, CPEMI, MaxOffs, NegOk,
-                                   IsSoImm, LongFormMaxOffs,
-                                   LongFormOpcode));
+                                   LongFormMaxOffs, LongFormOpcode));
 
           // Increment corresponding CPEntry reference count.
           CPEntry *CPE = findConstPoolEntry(CPI, CPEMI);
@@ -766,23 +763,8 @@ void MipsConstantIslands::updateForInsertedWaterBlock
   WaterList.insert(IP, NewBB);
 }
 
-/// getUserOffset - Compute the offset of U.MI as seen by the hardware
-/// displacement computation.  Update U.KnownAlignment to match its current
-/// basic block location.
 unsigned MipsConstantIslands::getUserOffset(CPUser &U) const {
-  unsigned UserOffset = getOffsetOf(U.MI);
-  const BasicBlockInfo &BBI = BBInfo[U.MI->getParent()->getNumber()];
-  unsigned KnownBits = BBI.internalKnownBits();
-
-  // The value read from PC is offset from the actual instruction address.
-
-
-  // Because of inline assembly, we may not know the alignment (mod 4) of U.MI.
-  // Make sure U.getMaxDisp() returns a constrained range.
-  U.KnownAlignment = (KnownBits >= 2);
-
-
-  return UserOffset;
+  return getOffsetOf(U.MI);
 }
 
 /// Split the basic block containing MI into two blocks, which are joined by
@@ -864,16 +846,14 @@ MachineBasicBlock *MipsConstantIslands::splitBlockBeforeInstr
 /// subtracted from MaxDisp instead. CPUser::getMaxDisp() does that.
 bool MipsConstantIslands::isOffsetInRange(unsigned UserOffset,
                                          unsigned TrialOffset, unsigned MaxDisp,
-                                         bool NegativeOK, bool IsSoImm) {
+                                         bool NegativeOK) {
   if (UserOffset <= TrialOffset) {
     // User before the Trial.
     if (TrialOffset - UserOffset <= MaxDisp)
       return true;
-    // FIXME: Make use full range of soimm values.
   } else if (NegativeOK) {
     if (UserOffset - TrialOffset <= MaxDisp)
       return true;
-    // FIXME: Make use full range of soimm values.
   }
   return false;
 }
