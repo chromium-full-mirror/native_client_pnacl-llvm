@@ -243,9 +243,8 @@ public:
     }
 
   /// \brief Vectorize the tree that starts with the elements in \p VL.
-  /// Returns the vectorized root and the scalar operations the root was based
-  /// on.
-  std::pair<Value *, ValueList *> vectorizeTree();
+  /// Returns the vectorized root.
+  Value *vectorizeTree();
 
   /// \returns the vectorization cost of the subtree that starts at \p VL.
   /// A negative number means that this is profitable.
@@ -1393,7 +1392,7 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
   return 0;
 }
 
-std::pair<Value *, BoUpSLP::ValueList *> BoUpSLP::vectorizeTree() {
+Value *BoUpSLP::vectorizeTree() {
   Builder.SetInsertPoint(F->getEntryBlock().begin());
   vectorizeTree(&VectorizableTree[0]);
 
@@ -1489,8 +1488,7 @@ std::pair<Value *, BoUpSLP::ValueList *> BoUpSLP::vectorizeTree() {
   }
   Builder.ClearInsertionPoint();
 
-  return std::make_pair(VectorizableTree[0].VectorizedValue,
-                        &VectorizableTree[0].Scalars);
+  return VectorizableTree[0].VectorizedValue;
 }
 
 void BoUpSLP::optimizeGatherSequence() {
@@ -2115,15 +2113,13 @@ public:
                    << ". (HorRdx)\n");
 
       // Vectorize a tree.
-      Value *VectorizedRoot;
-      BoUpSLP::ValueList *Scalars;
-      tie(VectorizedRoot, Scalars) = V.vectorizeTree();
+      DebugLoc Loc = cast<Instruction>(ReducedVals[i])->getDebugLoc();
+      Value *VectorizedRoot = V.vectorizeTree();
 
       // Emit a reduction.
       Value *ReducedSubTree = emitReduction(VectorizedRoot, Builder);
       if (VectorizedTree) {
-        Builder.SetCurrentDebugLocation(
-          cast<Instruction>((*Scalars)[0])->getDebugLoc());
+        Builder.SetCurrentDebugLocation(Loc);
         VectorizedTree = createBinOp(Builder, ReductionOpcode, VectorizedTree,
                                      ReducedSubTree, "bin.rdx");
       } else
