@@ -1060,7 +1060,7 @@ bool ARMFastISel::ARMEmitLoad(MVT VT, unsigned &ResultReg, Address &Addr,
           useAM3 = true;
         }
       }
-      RC = &ARM::GPRRegClass;
+      RC = isThumb2 ? &ARM::rGPRRegClass : &ARM::GPRnopcRegClass;
       break;
     case MVT::i16:
       if (Alignment && Alignment < 2 && !Subtarget->allowsUnalignedMem())
@@ -1075,7 +1075,7 @@ bool ARMFastISel::ARMEmitLoad(MVT VT, unsigned &ResultReg, Address &Addr,
         Opc = isZExt ? ARM::LDRH : ARM::LDRSH;
         useAM3 = true;
       }
-      RC = &ARM::GPRRegClass;
+      RC = isThumb2 ? &ARM::rGPRRegClass : &ARM::GPRnopcRegClass;
       break;
     case MVT::i32:
       if (Alignment && Alignment < 4 && !Subtarget->allowsUnalignedMem())
@@ -1089,7 +1089,7 @@ bool ARMFastISel::ARMEmitLoad(MVT VT, unsigned &ResultReg, Address &Addr,
       } else {
         Opc = ARM::LDRi12;
       }
-      RC = &ARM::GPRRegClass;
+      RC = isThumb2 ? &ARM::rGPRRegClass : &ARM::GPRnopcRegClass;
       break;
     case MVT::f32:
       if (!Subtarget->hasVFP2()) return false;
@@ -1098,7 +1098,7 @@ bool ARMFastISel::ARMEmitLoad(MVT VT, unsigned &ResultReg, Address &Addr,
         needVMOV = true;
         VT = MVT::i32;
         Opc = isThumb2 ? ARM::t2LDRi12 : ARM::LDRi12;
-        RC = &ARM::GPRRegClass;
+        RC = isThumb2 ? &ARM::rGPRRegClass : &ARM::GPRnopcRegClass;
       } else {
         Opc = ARM::VLDRS;
         RC = TLI.getRegClassFor(VT);
