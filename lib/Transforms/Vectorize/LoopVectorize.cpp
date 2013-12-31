@@ -2856,6 +2856,7 @@ void LoopVectorizationLegality::collectLoopUniforms() {
   }
 }
 
+namespace {
 /// \brief Analyses memory accesses in a loop.
 ///
 /// Checks whether run time pointer checks are needed and builds sets for data
@@ -2863,7 +2864,8 @@ void LoopVectorizationLegality::collectLoopUniforms() {
 class AccessAnalysis {
 public:
   /// \brief Read or write access location.
-  typedef std::pair<Value*, char> MemAccessInfo;
+  typedef PointerIntPair<Value *, 1, bool> MemAccessInfo;
+  typedef SmallPtrSet<MemAccessInfo, 8> MemAccessInfoSet;
 
   /// \brief Set of potential dependent memory accesses.
   typedef EquivalenceClasses<MemAccessInfo> DepCandidates;
@@ -2874,14 +2876,14 @@ public:
 
   /// \brief Register a load  and whether it is only read from.
   void addLoad(Value *Ptr, bool IsReadOnly) {
-    Accesses.insert(std::make_pair(Ptr, false));
+    Accesses.insert(MemAccessInfo(Ptr, false));
     if (IsReadOnly)
       ReadOnlyPtr.insert(Ptr);
   }
 
   /// \brief Register a store.
   void addStore(Value *Ptr) {
-    Accesses.insert(std::make_pair(Ptr, true));
+    Accesses.insert(MemAccessInfo(Ptr, true));
   }
 
   /// \brief Check whether we can check the pointers at runtime for
@@ -2903,7 +2905,7 @@ public:
 
   bool isDependencyCheckNeeded() { return !CheckDeps.empty(); }
 
-  DenseSet<MemAccessInfo> &getDependenciesToCheck() { return CheckDeps; }
+  MemAccessInfoSet &getDependenciesToCheck() { return CheckDeps; }
 
 private:
   typedef SetVector<MemAccessInfo> PtrAccessSet;
@@ -2924,7 +2926,7 @@ private:
   UnderlyingObjToAccessMap ObjToLastAccess;
 
   /// Set of accesses that need a further dependence check.
-  DenseSet<MemAccessInfo> CheckDeps;
+  MemAccessInfoSet CheckDeps;
 
   /// Set of pointers that are read only.
   SmallPtrSet<Value*, 16> ReadOnlyPtr;
@@ -2943,6 +2945,8 @@ private:
   bool AreAllReadsIdentified;
   bool IsRTCheckNeeded;
 };
+
+} // end anonymous namespace
 
 /// \brief Check whether a pointer can participate in a runtime bounds check.
 static bool hasComputableBounds(ScalarEvolution *SE, Value *Ptr) {
@@ -2973,11 +2977,11 @@ bool AccessAnalysis::canCheckPtrAtRT(
   for (PtrAccessSet::iterator AI = Accesses.begin(), AE = Accesses.end();
        AI != AE; ++AI) {
     const MemAccessInfo &Access = *AI;
-    Value *Ptr = Access.first;
-    bool IsWrite = Access.second;
+    Value *Ptr = Access.getPointer();
+    bool IsWrite = Access.getInt();
 
     // Just add write checks if we have both.
-    if (!IsWrite && Accesses.count(std::make_pair(Ptr, true)))
+    if (!IsWrite && Accesses.count(MemAccessInfo(Ptr, true)))
       continue;
 
     if (IsWrite)
@@ -2990,7 +2994,7 @@ bool AccessAnalysis::canCheckPtrAtRT(
       unsigned DepId;
 
       if (IsDepCheckNeeded) {
-        Value *Leader = DepCands.getLeaderValue(Access).first;
+        Value *Leader = DepCands.getLeaderValue(Access).getPointer();
         unsigned &LeaderId = DepSetId[Leader];
         if (!LeaderId)
           LeaderId = RunningDepId++;
@@ -3027,8 +3031,8 @@ void AccessAnalysis::processMemAccesses(bool UseDeferred) {
   PtrAccessSet &S = UseDeferred ? DeferredAccesses : Accesses;
   for (PtrAccessSet::iterator AI = S.begin(), AE = S.end(); AI != AE; ++AI) {
     const MemAccessInfo &Access = *AI;
-    Value *Ptr = Access.first;
-    bool IsWrite = Access.second;
+    Value *Ptr = Access.getPointer();
+    bool IsWrite = Access.getInt();
 
     DepCands.insert(Access);
 
@@ -3102,6 +3106,7 @@ void AccessAnalysis::processMemAccesses(bool UseDeferred) {
   }
 }
 
+namespace {
 /// \brief Checks memory dependences among accesses to the same underlying
 /// object to determine whether there vectorization is legal or not (and at
 /// which vectorization factor).
@@ -3136,7 +3141,8 @@ void AccessAnalysis::processMemAccesses(bool UseDeferred) {
 ///
 class MemoryDepChecker {
 public:
-  typedef std::pair<Value*, char> MemAccessInfo;
+  typedef PointerIntPair<Value *, 1, bool> MemAccessInfo;
+  typedef SmallPtrSet<MemAccessInfo, 8> MemAccessInfoSet;
 
   MemoryDepChecker(ScalarEvolution *Se, DataLayout *Dl, const Loop *L) :
     SE(Se), DL(Dl), InnermostLoop(L), AccessIdx(0) {}
@@ -3145,7 +3151,7 @@ public:
   /// of a write access.
   void addAccess(StoreInst *SI) {
     Value *Ptr = SI->getPointerOperand();
-    Accesses[std::make_pair(Ptr, true)].push_back(AccessIdx);
+    Accesses[MemAccessInfo(Ptr, true)].push_back(AccessIdx);
     InstMap.push_back(SI);
     ++AccessIdx;
   }
@@ -3154,7 +3160,7 @@ public:
   /// of a write access.
   void addAccess(LoadInst *LI) {
     Value *Ptr = LI->getPointerOperand();
-    Accesses[std::make_pair(Ptr, false)].push_back(AccessIdx);
+    Accesses[MemAccessInfo(Ptr, false)].push_back(AccessIdx);
     InstMap.push_back(LI);
     ++AccessIdx;
   }
@@ -3163,7 +3169,7 @@ public:
   ///
   /// Only checks sets with elements in \p CheckDeps.
   bool areDepsSafe(AccessAnalysis::DepCandidates &AccessSets,
-                   DenseSet<MemAccessInfo> &CheckDeps);
+                   MemAccessInfoSet &CheckDeps);
 
   /// \brief The maximum number of bytes of a vector register we can vectorize
   /// the accesses safely with.
@@ -3205,6 +3211,8 @@ private:
   /// forwarding.
   bool couldPreventStoreLoadForward(unsigned Distance, unsigned TypeByteSize);
 };
+
+} // end anonymous namespace
 
 static bool isInBoundsGep(Value *Ptr) {
   if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Ptr))
@@ -3325,10 +3333,10 @@ bool MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
                                    const MemAccessInfo &B, unsigned BIdx) {
   assert (AIdx < BIdx && "Must pass arguments in program order");
 
-  Value *APtr = A.first;
-  Value *BPtr = B.first;
-  bool AIsWrite = A.second;
-  bool BIsWrite = B.second;
+  Value *APtr = A.getPointer();
+  Value *BPtr = B.getPointer();
+  bool AIsWrite = A.getInt();
+  bool BIsWrite = B.getInt();
 
   // Two reads are independent.
   if (!AIsWrite && !BIsWrite)
@@ -3444,7 +3452,7 @@ bool MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
 
 bool
 MemoryDepChecker::areDepsSafe(AccessAnalysis::DepCandidates &AccessSets,
-                              DenseSet<MemAccessInfo> &CheckDeps) {
+                              MemAccessInfoSet &CheckDeps) {
 
   MaxSafeDepDistBytes = -1U;
   while (!CheckDeps.empty()) {
@@ -3485,11 +3493,6 @@ bool LoopVectorizationLegality::canVectorizeMemory() {
 
   typedef SmallVector<Value*, 16> ValueVector;
   typedef SmallPtrSet<Value*, 16> ValueSet;
-
-  // Stores a pair of memory access location and whether the access is a store
-  // (true) or a load (false).
-  typedef std::pair<Value*, char> MemAccessInfo;
-  typedef DenseSet<MemAccessInfo> PtrAccessSet;
 
   // Holds the Load and Store *instructions*.
   ValueVector Loads;
