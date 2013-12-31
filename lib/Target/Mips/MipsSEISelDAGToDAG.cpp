@@ -316,6 +316,20 @@ bool MipsSEDAGToDAGISel::selectAddrRegImm(SDValue Addr, SDValue &Base,
   return false;
 }
 
+/// ComplexPattern used on MipsInstrInfo
+/// Used on Mips Load/Store instructions
+bool MipsSEDAGToDAGISel::selectAddrRegReg(SDValue Addr, SDValue &Base,
+                                          SDValue &Offset) const {
+  // Operand is a result from an ADD.
+  if (Addr.getOpcode() == ISD::ADD) {
+    Base = Addr.getOperand(0);
+    Offset = Addr.getOperand(1);
+    return true;
+  }
+
+  return false;
+}
+
 bool MipsSEDAGToDAGISel::selectAddrDefault(SDValue Addr, SDValue &Base,
                                            SDValue &Offset) const {
   Base = Addr;
@@ -459,6 +473,22 @@ std::pair<bool, SDNode*> MipsSEDAGToDAGISel::selectNode(SDNode *Node) {
                                            getMSACtrlReg(RegIdx), MVT::i32);
       return std::make_pair(true, Reg.getNode());
     }
+    }
+    break;
+  }
+
+  case ISD::INTRINSIC_WO_CHAIN: {
+    switch (cast<ConstantSDNode>(Node->getOperand(0))->getZExtValue()) {
+    default:
+      break;
+
+    case Intrinsic::mips_move_v:
+      // Like an assignment but will always produce a move.v even if
+      // unnecessary.
+      return std::make_pair(true,
+                            CurDAG->getMachineNode(Mips::MOVE_V, DL,
+                                                   Node->getValueType(0),
+                                                   Node->getOperand(1)));
     }
     break;
   }
