@@ -641,7 +641,7 @@ void X86TargetLowering::resetOperationActions() {
   setOperationAction(ISD::STACKSAVE,          MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE,       MVT::Other, Expand);
 
-  if (Subtarget->isTargetCOFF() && !Subtarget->isTargetEnvMacho())
+  if (Subtarget->isOSWindows() && !Subtarget->isTargetEnvMacho())
     setOperationAction(ISD::DYNAMIC_STACKALLOC,
                        Subtarget->has64BitPointers() ? // @LOCALMOD
                        MVT::i64 : MVT::i32, Custom);
