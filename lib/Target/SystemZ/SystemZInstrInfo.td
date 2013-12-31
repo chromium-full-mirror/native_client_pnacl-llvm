@@ -254,6 +254,9 @@ def BASR  : InstRR<0x0D, (outs), (ins GR64:$R1, ADDR64:$R2),
 
 // Register moves.
 let neverHasSideEffects = 1 in {
+  // Expands to LR, RISBHG or RISBLG, depending on the choice of registers.
+  def LRMux : UnaryRRPseudo<"l", null_frag, GRX32, GRX32>,
+              Requires<[FeatureHighWord]>;
   def LR  : UnaryRR <"l",  0x18,   null_frag, GR32, GR32>;
   def LGR : UnaryRRE<"lg", 0xB904, null_frag, GR64, GR64>;
 }
@@ -293,7 +296,12 @@ let neverHasSideEffects = 1, isAsCheapAsAMove = 1, isMoveImm = 1,
 
 // Register loads.
 let canFoldAsLoad = 1, SimpleBDXLoad = 1 in {
+  // Expands to L, LY or LFH, depending on the choice of register.
+  def LMux : UnaryRXYPseudo<"l", load, GRX32, 4>,
+             Requires<[FeatureHighWord]>;
   defm L : UnaryRXPair<"l", 0x58, 0xE358, load, GR32, 4>;
+  def LFH : UnaryRXY<"lfh", 0xE3CA, load, GRH32, 4>,
+            Requires<[FeatureHighWord]>;
   def LG : UnaryRXY<"lg", 0xE304, load, GR64, 8>;
 
   // These instructions are split after register allocation, so we don't
@@ -325,7 +333,12 @@ let Uses = [CC] in {
 
 // Register stores.
 let SimpleBDXStore = 1 in {
+  // Expands to ST, STY or STFH, depending on the choice of register.
+  def STMux : StoreRXYPseudo<store, GRX32, 4>,
+              Requires<[FeatureHighWord]>;
   defm ST : StoreRXPair<"st", 0x50, 0xE350, store, GR32, 4>;
+  def STFH : StoreRXY<"stfh", 0xE3CB, store, GRH32, 4>,
+             Requires<[FeatureHighWord]>;
   def STG : StoreRXY<"stg", 0xE324, store, GR64, 8>;
 
   // These instructions are split after register allocation, so we don't
@@ -395,9 +408,21 @@ let Defs = [CC], CCValues = 0xE, CompareZeroCCMask = 0xE in
 def : Pat<(sext_inreg GR64:$src, i32),
           (LGFR (EXTRACT_SUBREG GR64:$src, subreg_l32))>;
 
-// 32-bit extensions from memory.
-def  LB   : UnaryRXY<"lb", 0xE376, asextloadi8, GR32, 1>;
+// 32-bit extensions from 8-bit memory.  LBMux expands to LB or LBH,
+// depending on the choice of register.
+def LBMux : UnaryRXYPseudo<"lb", asextloadi8, GRX32, 1>,
+            Requires<[FeatureHighWord]>;
+def LB  : UnaryRXY<"lb", 0xE376, asextloadi8, GR32, 1>;
+def LBH : UnaryRXY<"lbh", 0xE3C0, asextloadi8, GRH32, 1>,
+          Requires<[FeatureHighWord]>;
+
+// 32-bit extensions from 16-bit memory.  LHMux expands to LH or LHH,
+// depending on the choice of register.
+def LHMux : UnaryRXYPseudo<"lh", asextloadi16, GRX32, 2>,
+            Requires<[FeatureHighWord]>;
 defm LH   : UnaryRXPair<"lh", 0x48, 0xE378, asextloadi16, GR32, 2>;
+def  LHH  : UnaryRXY<"lhh", 0xE3C4, asextloadi16, GRH32, 2>,
+            Requires<[FeatureHighWord]>;
 def  LHRL : UnaryRILPC<"lhrl", 0xC45, aligned_asextloadi16, GR32>;
 
 // 64-bit extensions from memory.
@@ -431,9 +456,21 @@ let neverHasSideEffects = 1 in {
 def : Pat<(and GR64:$src, 0xffffffff),
           (LLGFR (EXTRACT_SUBREG GR64:$src, subreg_l32))>;
 
-// 32-bit extensions from memory.
-def LLC   : UnaryRXY<"llc", 0xE394, azextloadi8,  GR32, 1>;
+// 32-bit extensions from 8-bit memory.  LLCMux expands to LLC or LLCH,
+// depending on the choice of register.
+def LLCMux : UnaryRXYPseudo<"llc", azextloadi8, GRX32, 1>,
+             Requires<[FeatureHighWord]>;
+def LLC  : UnaryRXY<"llc", 0xE394, azextloadi8, GR32, 1>;
+def LLCH : UnaryRXY<"llch", 0xE3C2, azextloadi8, GR32, 1>,
+           Requires<[FeatureHighWord]>;
+
+// 32-bit extensions from 16-bit memory.  LLHMux expands to LLH or LLHH,
+// depending on the choice of register.
+def LLHMux : UnaryRXYPseudo<"llh", azextloadi16, GRX32, 2>,
+             Requires<[FeatureHighWord]>;
 def LLH   : UnaryRXY<"llh", 0xE395, azextloadi16, GR32, 2>;
+def LLHH  : UnaryRXY<"llhh", 0xE3C6, azextloadi16, GR32, 2>,
+            Requires<[FeatureHighWord]>;
 def LLHRL : UnaryRILPC<"llhrl", 0xC42, aligned_azextloadi16, GR32>;
 
 // 64-bit extensions from memory.
@@ -451,10 +488,22 @@ def LLGFRL : UnaryRILPC<"llgfrl", 0xC4E, aligned_azextloadi32, GR64>;
 def : Pat<(i32 (trunc GR64:$src)),
           (EXTRACT_SUBREG GR64:$src, subreg_l32)>;
 
-// Truncations of 32-bit registers to memory.
-defm STC   : StoreRXPair<"stc", 0x42, 0xE372, truncstorei8,  GR32, 1>;
-defm STH   : StoreRXPair<"sth", 0x40, 0xE370, truncstorei16, GR32, 2>;
-def  STHRL : StoreRILPC<"sthrl", 0xC47, aligned_truncstorei16, GR32>;
+// Truncations of 32-bit registers to 8-bit memory.  STCMux expands to
+// STC, STCY or STCH, depending on the choice of register.
+def STCMux : StoreRXYPseudo<truncstorei8, GRX32, 1>,
+             Requires<[FeatureHighWord]>;
+defm STC : StoreRXPair<"stc", 0x42, 0xE372, truncstorei8, GR32, 1>;
+def STCH : StoreRXY<"stch", 0xE3C3, truncstorei8, GRH32, 1>,
+           Requires<[FeatureHighWord]>;
+
+// Truncations of 32-bit registers to 16-bit memory.  STHMux expands to
+// STH, STHY or STHH, depending on the choice of register.
+def STHMux : StoreRXYPseudo<truncstorei16, GRX32, 1>,
+             Requires<[FeatureHighWord]>;
+defm STH : StoreRXPair<"sth", 0x40, 0xE370, truncstorei16, GR32, 2>;
+def STHH : StoreRXY<"sthh", 0xE3C7, truncstorei16, GRH32, 2>,
+           Requires<[FeatureHighWord]>;
+def STHRL : StoreRILPC<"sthrl", 0xC47, aligned_truncstorei16, GR32>;
 
 // Truncations of 64-bit registers to memory.
 defm : StoreGR64Pair<STC, STCY, truncstorei8>;
@@ -925,12 +974,13 @@ let Defs = [CC] in {
 
 // Forms of RISBG that only affect one word of the destination register.
 // They do not set CC.
-let isCodeGenOnly = 1 in
-  def RISBLG32 : RotateSelectRIEf<"risblg", 0xEC51, GR32, GR32>,
-                 Requires<[FeatureHighWord]>;
-def RISBHG : RotateSelectRIEf<"risbhg", 0xEC5D, GRH32, GR64>,
-             Requires<[FeatureHighWord]>;
+def RISBLL : RotateSelectAliasRIEf<GR32,  GR32>,  Requires<[FeatureHighWord]>;
+def RISBLH : RotateSelectAliasRIEf<GR32,  GRH32>, Requires<[FeatureHighWord]>;
+def RISBHL : RotateSelectAliasRIEf<GRH32, GR32>,  Requires<[FeatureHighWord]>;
+def RISBHH : RotateSelectAliasRIEf<GRH32, GRH32>, Requires<[FeatureHighWord]>;
 def RISBLG : RotateSelectRIEf<"risblg", 0xEC51, GR32, GR64>,
+             Requires<[FeatureHighWord]>;
+def RISBHG : RotateSelectRIEf<"risbhg", 0xEC5D, GRH32, GR64>,
              Requires<[FeatureHighWord]>;
 
 // Rotate second operand left and perform a logical operation with selected
