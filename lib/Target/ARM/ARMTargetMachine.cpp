@@ -172,7 +172,7 @@ bool ARMPassConfig::addPreISel() {
   // get back the performance benefits of GlobalMerge.
   if (TM->getOptLevel() != CodeGenOpt::None && EnableGlobalMerge &&
       !getARMSubtarget().isTargetNaCl())
-    addPass(createGlobalMergePass(TM->getTargetLowering()));
+    addPass(createGlobalMergePass(TM));
   // @LOCALMOD-END
 
   return false;
