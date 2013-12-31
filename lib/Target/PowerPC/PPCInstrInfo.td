@@ -434,7 +434,7 @@ def PPCS16ImmAsmOperand : AsmOperandClass {
 }
 def s16imm  : Operand<i32> {
   let PrintMethod = "printS16ImmOperand";
-  let EncoderMethod = "getS16ImmEncoding";
+  let EncoderMethod = "getImm16Encoding";
   let ParserMatchClass = PPCS16ImmAsmOperand;
 }
 def PPCU16ImmAsmOperand : AsmOperandClass {
@@ -443,7 +443,20 @@ def PPCU16ImmAsmOperand : AsmOperandClass {
 }
 def u16imm  : Operand<i32> {
   let PrintMethod = "printU16ImmOperand";
+  let EncoderMethod = "getImm16Encoding";
   let ParserMatchClass = PPCU16ImmAsmOperand;
+}
+def PPCS17ImmAsmOperand : AsmOperandClass {
+  let Name = "S17Imm"; let PredicateMethod = "isS17Imm";
+  let RenderMethod = "addImmOperands";
+}
+def s17imm  : Operand<i32> {
+  // This operand type is used for addis/lis to allow the assembler parser
+  // to accept immediates in the range -65536..65535 for compatibility with
+  // the GNU assembler.  The operand is treated as 16-bit otherwise.
+  let PrintMethod = "printS16ImmOperand";
+  let EncoderMethod = "getImm16Encoding";
+  let ParserMatchClass = PPCS17ImmAsmOperand;
 }
 def PPCDirectBrAsmOperand : AsmOperandClass {
   let Name = "DirectBr"; let PredicateMethod = "isDirectBr";
@@ -1518,7 +1531,7 @@ def ADDICo : DForm_2<13, (outs gprc:$rD), (ins gprc:$rA, s16imm:$imm),
                      "addic. $rD, $rA, $imm", IntGeneral,
                      []>, isDOT, RecFormRel;
 }
-def ADDIS  : DForm_2<15, (outs gprc:$rD), (ins gprc_nor0:$rA, s16imm:$imm),
+def ADDIS  : DForm_2<15, (outs gprc:$rD), (ins gprc_nor0:$rA, s17imm:$imm),
                      "addis $rD, $rA, $imm", IntSimple,
                      [(set i32:$rD, (add i32:$rA, imm16ShiftedSExt:$imm))]>;
 let isCodeGenOnly = 1 in
@@ -1538,7 +1551,7 @@ let isReMaterializable = 1, isAsCheapAsAMove = 1, isMoveImm = 1 in {
   def LI  : DForm_2_r0<14, (outs gprc:$rD), (ins s16imm:$imm),
                        "li $rD, $imm", IntSimple,
                        [(set i32:$rD, imm32SExt16:$imm)]>;
-  def LIS : DForm_2_r0<15, (outs gprc:$rD), (ins s16imm:$imm),
+  def LIS : DForm_2_r0<15, (outs gprc:$rD), (ins s17imm:$imm),
                        "lis $rD, $imm", IntSimple,
                        [(set i32:$rD, imm16ShiftedSExt:$imm)]>;
 }
