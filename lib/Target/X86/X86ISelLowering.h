@@ -868,7 +868,6 @@ namespace llvm {
     SDValue LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerShiftParts(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerBITCAST(SDValue op, SelectionDAG &DAG) const;
     SDValue LowerSINT_TO_FP(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerUINT_TO_FP(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerUINT_TO_FP_i64(SDValue Op, SelectionDAG &DAG) const;
@@ -904,10 +903,7 @@ namespace llvm {
     SDValue lowerEH_SJLJ_LONGJMP(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerINIT_TRAMPOLINE(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFLT_ROUNDS_(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerShift(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerSDIV(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSIGN_EXTEND_INREG(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerFSINCOS(SDValue Op, SelectionDAG &DAG) const;
 
     // @LOCALMOD-BEGIN
     SDValue LowerNaClTpTlsOffset(SDValue Op, SelectionDAG &DAG) const;

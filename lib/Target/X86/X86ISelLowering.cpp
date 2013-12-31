@@ -12296,7 +12296,7 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget *Subtarget,
   return DAG.getNode(ISD::ADD, dl, VT, Res, AhiBlo);
 }
 
-SDValue X86TargetLowering::LowerSDIV(SDValue Op, SelectionDAG &DAG) const {
+static SDValue LowerSDIV(SDValue Op, SelectionDAG &DAG) {
   EVT VT = Op.getValueType();
   EVT EltTy = VT.getVectorElementType();
   unsigned NumElts = VT.getVectorNumElements();
@@ -12643,7 +12643,8 @@ static SDValue LowerScalarVariableShift(SDValue Op, SelectionDAG &DAG,
   return SDValue();
 }
 
-SDValue X86TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
+static SDValue LowerShift(SDValue Op, const X86Subtarget* Subtarget,
+                          SelectionDAG &DAG) {
 
   EVT VT = Op.getValueType();
   SDLoc dl(Op);
@@ -13001,9 +13002,10 @@ static SDValue LowerREADCYCLECOUNTER(SDValue Op, const X86Subtarget *Subtarget,
   return DAG.getMergeValues(Ops, array_lengthof(Ops), dl);
 }
 
-SDValue X86TargetLowering::LowerBITCAST(SDValue Op, SelectionDAG &DAG) const {
-  EVT SrcVT = Op.getOperand(0).getValueType();
-  EVT DstVT = Op.getValueType();
+static SDValue LowerBITCAST(SDValue Op, const X86Subtarget *Subtarget,
+                            SelectionDAG &DAG) {
+  MVT SrcVT = Op.getOperand(0).getValueType().getSimpleVT();
+  MVT DstVT = Op.getValueType().getSimpleVT();
   assert(Subtarget->is64Bit() && !Subtarget->hasSSE2() &&
          Subtarget->hasMMX() && "Unexpected custom BITCAST");
   assert((DstVT == MVT::i64 ||
@@ -13088,7 +13090,8 @@ static SDValue LowerADDC_ADDE_SUBC_SUBE(SDValue Op, SelectionDAG &DAG) {
                      Op.getOperand(1), Op.getOperand(2));
 }
 
-SDValue X86TargetLowering::LowerFSINCOS(SDValue Op, SelectionDAG &DAG) const {
+static SDValue LowerFSINCOS(SDValue Op, const X86Subtarget *Subtarget,
+                            SelectionDAG &DAG) {
   assert(Subtarget->isTargetDarwin() && Subtarget->is64Bit());
 
   // For MacOSX, we want to call an alternative entry point: __sincos_stret,
@@ -13099,8 +13102,8 @@ SDValue X86TargetLowering::LowerFSINCOS(SDValue Op, SelectionDAG &DAG) const {
   EVT ArgVT = Arg.getValueType();
   Type *ArgTy = ArgVT.getTypeForEVT(*DAG.getContext());
 
-  ArgListTy Args;
-  ArgListEntry Entry;
+  TargetLowering::ArgListTy Args;
+  TargetLowering::ArgListEntry Entry;
 
   Entry.Node = Arg;
   Entry.Ty = ArgTy;
@@ -13113,7 +13116,8 @@ SDValue X86TargetLowering::LowerFSINCOS(SDValue Op, SelectionDAG &DAG) const {
   // the small struct {f32, f32} is returned in (eax, edx). For f64,
   // the results are returned via SRet in memory.
   const char *LibcallName =  isF64 ? "__sincos_stret" : "__sincosf_stret";
-  SDValue Callee = DAG.getExternalSymbol(LibcallName, getPointerTy());
+  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  SDValue Callee = DAG.getExternalSymbol(LibcallName, TLI.getPointerTy());
 
   Type *RetTy = isF64
     ? (Type*)StructType::get(ArgTy, ArgTy, NULL)
@@ -13124,7 +13128,7 @@ SDValue X86TargetLowering::LowerFSINCOS(SDValue Op, SelectionDAG &DAG) const {
                          CallingConv::C, /*isTaillCall=*/false,
                          /*doesNotRet=*/false, /*isReturnValueUsed*/true,
                          Callee, Args, DAG, dl);
-  std::pair<SDValue, SDValue> CallResult = LowerCallTo(CLI);
+  std::pair<SDValue, SDValue> CallResult = TLI.LowerCallTo(CLI);
 
   if (isF64)
     // Returned in xmm0 and xmm1.
@@ -13204,7 +13208,7 @@ SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::MUL:                return LowerMUL(Op, Subtarget, DAG);
   case ISD::SRA:
   case ISD::SRL:
-  case ISD::SHL:                return LowerShift(Op, DAG);
+  case ISD::SHL:                return LowerShift(Op, Subtarget, DAG);
   case ISD::SADDO:
   case ISD::UADDO:
   case ISD::SSUBO:
@@ -13212,7 +13216,7 @@ SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::SMULO:
   case ISD::UMULO:              return LowerXALUO(Op, DAG);
   case ISD::READCYCLECOUNTER:   return LowerREADCYCLECOUNTER(Op, Subtarget,DAG);
-  case ISD::BITCAST:            return LowerBITCAST(Op, DAG);
+  case ISD::BITCAST:            return LowerBITCAST(Op, Subtarget, DAG);
   case ISD::ADDC:
   case ISD::ADDE:
   case ISD::SUBC:
@@ -13220,7 +13224,7 @@ SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::ADD:                return LowerADD(Op, DAG);
   case ISD::SUB:                return LowerSUB(Op, DAG);
   case ISD::SDIV:               return LowerSDIV(Op, DAG);
-  case ISD::FSINCOS:            return LowerFSINCOS(Op, DAG);
+  case ISD::FSINCOS:            return LowerFSINCOS(Op, Subtarget, DAG);
   // @LOCALMOD-BEGIN
   case ISD::NACL_TP_TLS_OFFSET:    return LowerNaClTpTlsOffset(Op, DAG);
   case ISD::NACL_TP_TDB_OFFSET:    return LowerNaClTpTdbOffset(Op, DAG);
