@@ -769,9 +769,8 @@ void DwarfDebug::constructSubprogramDIE(CompileUnit *TheCU,
   // Add to context owner.
   TheCU->addToContextOwner(SubprogramDie, SP.getContext());
 
-  // Expose as global, if requested.
-  if (HasDwarfPubSections)
-    TheCU->addGlobalName(SP.getName(), SubprogramDie);
+  // Expose as a global name.
+  TheCU->addGlobalName(SP.getName(), SubprogramDie);
 }
 
 void DwarfDebug::constructImportedEntityDIE(CompileUnit *TheCU,
@@ -1109,7 +1108,7 @@ void DwarfDebug::endModule() {
 
   // Emit the pubnames and pubtypes sections if requested.
   if (HasDwarfPubSections) {
-    emitDebugPubnames();
+    emitDebugPubNames();
     emitDebugPubTypes();
   }
 
@@ -2252,9 +2251,9 @@ void DwarfDebug::emitAccelTypes() {
   AT.Emit(Asm, SectionBegin, &InfoHolder);
 }
 
-/// emitDebugPubnames - Emit visible names into a debug pubnames section.
+/// emitDebugPubNames - Emit visible names into a debug pubnames section.
 ///
-void DwarfDebug::emitDebugPubnames() {
+void DwarfDebug::emitDebugPubNames() {
   const MCSection *ISec = Asm->getObjFileLowering().getDwarfInfoSection();
 
   typedef DenseMap<const MDNode*, CompileUnit*> CUMapType;
