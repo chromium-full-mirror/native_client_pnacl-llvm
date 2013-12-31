@@ -11,7 +11,7 @@ class TestingConfig:
     @staticmethod
     def fromdefaults(litConfig):
         """
-        fromdefaults(litConfig -> TestingConfig
+        fromdefaults(litConfig) -> TestingConfig
 
         Create a TestingConfig object with default values.
         """
@@ -74,7 +74,6 @@ class TestingConfig:
         # Execute the config script to initialize the object.
         cfg_globals = dict(globals())
         cfg_globals['config'] = self
-        cfg_globals['lit'] = litConfig
         cfg_globals['lit_config'] = litConfig
         cfg_globals['__file__'] = path
         try:
