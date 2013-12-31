@@ -3086,6 +3086,7 @@ namespace llvm {
     UseFastISel |= Subtarget->isTargetIOS() && !Subtarget->isThumb1Only();
     UseFastISel |= Subtarget->isTargetLinux() && !Subtarget->isThumb();
     UseFastISel |= Subtarget->isTargetNaCl() && !Subtarget->isThumb();
+
     if (UseFastISel) {
       // iOS always has a FP for backtracking, force other targets
       // to keep their FP when doing FastISel. The emitted code is
