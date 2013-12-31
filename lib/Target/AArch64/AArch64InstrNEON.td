@@ -50,6 +50,9 @@ def Neon_vdup : SDNode<"AArch64ISD::NEON_VDUP", SDTypeProfile<1, 1,
                        [SDTCisVec<0>]>>;
 def Neon_vduplane : SDNode<"AArch64ISD::NEON_VDUPLANE", SDTypeProfile<1, 2,
                            [SDTCisVec<0>, SDTCisVec<1>, SDTCisVT<2, i64>]>>;
+def Neon_vextract : SDNode<"AArch64ISD::NEON_VEXTRACT", SDTypeProfile<1, 3,
+                           [SDTCisVec<0>,  SDTCisSameAs<0, 1>,
+                           SDTCisSameAs<0, 2>, SDTCisVT<3, i64>]>>;
 
 //===----------------------------------------------------------------------===//
 // Multiclasses
@@ -1062,7 +1065,7 @@ def neon_uimm8_asmoperand : AsmOperandClass
 
 def neon_uimm8 : Operand<i32>, ImmLeaf<i32, [{(void)Imm; return true;}]> {
   let ParserMatchClass = neon_uimm8_asmoperand;
-  let PrintMethod = "printNeonUImm8Operand";
+  let PrintMethod = "printUImmHexOperand";
 }
 
 def neon_uimm64_mask_asmoperand : AsmOperandClass
@@ -2356,6 +2359,335 @@ defm FMAXV : NeonI_2VAcross_3<0b1, 0b01111, 0b00, "fmaxv",
                               int_aarch64_neon_vmaxv>;
 defm FMINV : NeonI_2VAcross_3<0b1, 0b01111, 0b10, "fminv",
                               int_aarch64_neon_vminv>;
+
+// The followings are for instruction class (Perm)
+
+class NeonI_Permute<bit q, bits<2> size, bits<3> opcode,
+                    string asmop, RegisterOperand OpVPR, string OpS>
+  : NeonI_Perm<q, size, opcode,
+               (outs OpVPR:$Rd), (ins OpVPR:$Rn, OpVPR:$Rm),
+               asmop # "\t$Rd." # OpS # ", $Rn." # OpS # ", $Rm." # OpS,
+               [], NoItinerary>;
+
+multiclass NeonI_Perm_pat<bits<3> opcode, string asmop> {
+   def _8b  : NeonI_Permute<0b0, 0b00, opcode, asmop, VPR64,  "8b">;
+   def _16b : NeonI_Permute<0b1, 0b00, opcode, asmop, VPR128, "16b">;
+   def _4h  : NeonI_Permute<0b0, 0b01, opcode, asmop, VPR64,  "4h">;
+   def _8h  : NeonI_Permute<0b1, 0b01, opcode, asmop, VPR128, "8h">;
+   def _2s  : NeonI_Permute<0b0, 0b10, opcode, asmop, VPR64,  "2s">;
+   def _4s  : NeonI_Permute<0b1, 0b10, opcode, asmop, VPR128, "4s">;
+   def _2d  : NeonI_Permute<0b1, 0b11, opcode, asmop, VPR128, "2d">;
+}                          
+
+defm UZP1vvv : NeonI_Perm_pat<0b001, "uzp1">;
+defm TRN1vvv : NeonI_Perm_pat<0b010, "trn1">;
+defm ZIP1vvv : NeonI_Perm_pat<0b011, "zip1">;
+defm UZP2vvv : NeonI_Perm_pat<0b101, "uzp2">;
+defm TRN2vvv : NeonI_Perm_pat<0b110, "trn2">;
+defm ZIP2vvv : NeonI_Perm_pat<0b111, "zip2">;
+
+// Extract and Insert
+def NI_ei_i32 : PatFrag<(ops node:$Rn, node:$Rm, node:$Ext, node:$Ins),
+                        (vector_insert node:$Rn,
+                          (i32 (vector_extract node:$Rm, node:$Ext)),
+                          node:$Ins)>;
+
+def NI_ei_f32 : PatFrag<(ops node:$Rn, node:$Rm, node:$Ext, node:$Ins),
+                        (vector_insert node:$Rn,
+                          (f32 (vector_extract node:$Rm, node:$Ext)),
+                          node:$Ins)>;
+
+// uzp1
+def : Pat<(v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 VPR128:$Rn),
+          (v16i8 VPR128:$Rn), 2,  1)),
+          (v16i8 VPR128:$Rn), 4,  2)),
+          (v16i8 VPR128:$Rn), 6,  3)),
+          (v16i8 VPR128:$Rn), 8,  4)),
+          (v16i8 VPR128:$Rn), 10, 5)),
+          (v16i8 VPR128:$Rn), 12, 6)),
+          (v16i8 VPR128:$Rn), 14, 7)),
+          (v16i8 VPR128:$Rm), 0,  8)),
+          (v16i8 VPR128:$Rm), 2,  9)),
+          (v16i8 VPR128:$Rm), 4,  10)),
+          (v16i8 VPR128:$Rm), 6,  11)),
+          (v16i8 VPR128:$Rm), 8,  12)),
+          (v16i8 VPR128:$Rm), 10, 13)),
+          (v16i8 VPR128:$Rm), 12, 14)),
+          (v16i8 VPR128:$Rm), 14, 15)),
+          (UZP1vvv_16b VPR128:$Rn, VPR128:$Rm)>;
+
+class NI_Uzp1_v8<ValueType Ty, RegisterOperand VPR, Instruction INST>
+  : Pat<(Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty VPR:$Rn),
+        (Ty VPR:$Rn), 2, 1)),
+        (Ty VPR:$Rn), 4, 2)),
+        (Ty VPR:$Rn), 6, 3)),
+        (Ty VPR:$Rm), 0, 4)),
+        (Ty VPR:$Rm), 2, 5)),
+        (Ty VPR:$Rm), 4, 6)),
+        (Ty VPR:$Rm), 6, 7)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Uzp1_v8<v8i8, VPR64, UZP1vvv_8b>;
+def : NI_Uzp1_v8<v8i16, VPR128, UZP1vvv_8h>;
+
+class NI_Uzp1_v4<ValueType Ty, RegisterOperand VPR, Instruction INST,
+                 PatFrag ei>
+  : Pat<(Ty (ei (Ty (ei (Ty (ei
+        (Ty VPR:$Rn),
+        (Ty VPR:$Rn), 2, 1)),
+        (Ty VPR:$Rm), 0, 2)),
+        (Ty VPR:$Rm), 2, 3)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Uzp1_v4<v4i16, VPR64, UZP1vvv_4h, NI_ei_i32>;
+def : NI_Uzp1_v4<v4i32, VPR128, UZP1vvv_4s, NI_ei_i32>;
+def : NI_Uzp1_v4<v4f32, VPR128, UZP1vvv_4s, NI_ei_f32>;
+
+// uzp2
+def : Pat<(v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 
+          (v16i8 VPR128:$Rm),
+          (v16i8 VPR128:$Rn), 1,  0)),
+          (v16i8 VPR128:$Rn), 3,  1)),
+          (v16i8 VPR128:$Rn), 5,  2)),
+          (v16i8 VPR128:$Rn), 7,  3)),
+          (v16i8 VPR128:$Rn), 9,  4)),
+          (v16i8 VPR128:$Rn), 11, 5)),
+          (v16i8 VPR128:$Rn), 13, 6)),
+          (v16i8 VPR128:$Rn), 15, 7)),
+          (v16i8 VPR128:$Rm), 1,  8)),
+          (v16i8 VPR128:$Rm), 3,  9)),
+          (v16i8 VPR128:$Rm), 5,  10)),
+          (v16i8 VPR128:$Rm), 7,  11)),
+          (v16i8 VPR128:$Rm), 9,  12)),
+          (v16i8 VPR128:$Rm), 11, 13)),
+          (v16i8 VPR128:$Rm), 13, 14)),
+          (UZP2vvv_16b VPR128:$Rn, VPR128:$Rm)>;
+
+class NI_Uzp2_v8<ValueType Ty, RegisterOperand VPR, Instruction INST>
+  : Pat<(Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty VPR:$Rm),
+        (Ty VPR:$Rn), 1, 0)),
+        (Ty VPR:$Rn), 3, 1)),
+        (Ty VPR:$Rn), 5, 2)),
+        (Ty VPR:$Rn), 7, 3)),
+        (Ty VPR:$Rm), 1, 4)),
+        (Ty VPR:$Rm), 3, 5)),
+        (Ty VPR:$Rm), 5, 6)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Uzp2_v8<v8i8, VPR64, UZP2vvv_8b>;
+def : NI_Uzp2_v8<v8i16, VPR128, UZP2vvv_8h>;
+
+class NI_Uzp2_v4<ValueType Ty, RegisterOperand VPR, Instruction INST,
+                 PatFrag ei>
+  : Pat<(Ty (ei (Ty (ei (Ty (ei
+        (Ty VPR:$Rm),
+        (Ty VPR:$Rn), 1, 0)),
+        (Ty VPR:$Rn), 3, 1)),
+        (Ty VPR:$Rm), 1, 2)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Uzp2_v4<v4i16, VPR64, UZP2vvv_4h, NI_ei_i32>;
+def : NI_Uzp2_v4<v4i32, VPR128, UZP2vvv_4s, NI_ei_i32>;
+def : NI_Uzp2_v4<v4f32, VPR128, UZP2vvv_4s, NI_ei_f32>;
+
+// zip1
+def : Pat<(v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 VPR128:$Rn),
+          (v16i8 VPR128:$Rm), 0, 1)),
+          (v16i8 VPR128:$Rn), 1, 2)),
+          (v16i8 VPR128:$Rm), 1, 3)),
+          (v16i8 VPR128:$Rn), 2, 4)),
+          (v16i8 VPR128:$Rm), 2, 5)),
+          (v16i8 VPR128:$Rn), 3, 6)),
+          (v16i8 VPR128:$Rm), 3, 7)),
+          (v16i8 VPR128:$Rn), 4, 8)),
+          (v16i8 VPR128:$Rm), 4, 9)),
+          (v16i8 VPR128:$Rn), 5, 10)),
+          (v16i8 VPR128:$Rm), 5, 11)),
+          (v16i8 VPR128:$Rn), 6, 12)),
+          (v16i8 VPR128:$Rm), 6, 13)),
+          (v16i8 VPR128:$Rn), 7, 14)),
+          (v16i8 VPR128:$Rm), 7, 15)),
+          (ZIP1vvv_16b VPR128:$Rn, VPR128:$Rm)>;
+
+class NI_Zip1_v8<ValueType Ty, RegisterOperand VPR, Instruction INST>
+  : Pat<(Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty VPR:$Rn),
+        (Ty VPR:$Rm), 0, 1)),
+        (Ty VPR:$Rn), 1, 2)),
+        (Ty VPR:$Rm), 1, 3)),
+        (Ty VPR:$Rn), 2, 4)),
+        (Ty VPR:$Rm), 2, 5)),
+        (Ty VPR:$Rn), 3, 6)),
+        (Ty VPR:$Rm), 3, 7)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Zip1_v8<v8i8, VPR64, ZIP1vvv_8b>;
+def : NI_Zip1_v8<v8i16, VPR128, ZIP1vvv_8h>;
+
+class NI_Zip1_v4<ValueType Ty, RegisterOperand VPR, Instruction INST,
+                 PatFrag ei>
+  : Pat<(Ty (ei (Ty (ei (Ty (ei
+        (Ty VPR:$Rn),
+        (Ty VPR:$Rm), 0, 1)),
+        (Ty VPR:$Rn), 1, 2)),
+        (Ty VPR:$Rm), 1, 3)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Zip1_v4<v4i16, VPR64, ZIP1vvv_4h, NI_ei_i32>;
+def : NI_Zip1_v4<v4i32, VPR128, ZIP1vvv_4s, NI_ei_i32>;
+def : NI_Zip1_v4<v4f32, VPR128, ZIP1vvv_4s, NI_ei_f32>;
+
+// zip2
+def : Pat<(v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 VPR128:$Rm),
+          (v16i8 VPR128:$Rn), 8, 0)),
+          (v16i8 VPR128:$Rm), 8, 1)),
+          (v16i8 VPR128:$Rn), 9, 2)),
+          (v16i8 VPR128:$Rm), 9, 3)),
+          (v16i8 VPR128:$Rn), 10, 4)),
+          (v16i8 VPR128:$Rm), 10, 5)),
+          (v16i8 VPR128:$Rn), 11, 6)),
+          (v16i8 VPR128:$Rm), 11, 7)),
+          (v16i8 VPR128:$Rn), 12, 8)),
+          (v16i8 VPR128:$Rm), 12, 9)),
+          (v16i8 VPR128:$Rn), 13, 10)),
+          (v16i8 VPR128:$Rm), 13, 11)),
+          (v16i8 VPR128:$Rn), 14, 12)),
+          (v16i8 VPR128:$Rm), 14, 13)),
+          (v16i8 VPR128:$Rn), 15, 14)),
+          (ZIP2vvv_16b VPR128:$Rn, VPR128:$Rm)>;
+
+class NI_Zip2_v8<ValueType Ty, RegisterOperand VPR, Instruction INST>
+  : Pat<(Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty VPR:$Rm),
+        (Ty VPR:$Rn), 4, 0)),
+        (Ty VPR:$Rm), 4, 1)),
+        (Ty VPR:$Rn), 5, 2)),
+        (Ty VPR:$Rm), 5, 3)),
+        (Ty VPR:$Rn), 6, 4)),
+        (Ty VPR:$Rm), 6, 5)),
+        (Ty VPR:$Rn), 7, 6)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Zip2_v8<v8i8, VPR64, ZIP2vvv_8b>;
+def : NI_Zip2_v8<v8i16, VPR128, ZIP2vvv_8h>;
+
+class NI_Zip2_v4<ValueType Ty, RegisterOperand VPR, Instruction INST,
+                 PatFrag ei>
+  : Pat<(Ty (ei (Ty (ei (Ty (ei
+        (Ty VPR:$Rm),
+        (Ty VPR:$Rn), 2, 0)),
+        (Ty VPR:$Rm), 2, 1)),
+        (Ty VPR:$Rn), 3, 2)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Zip2_v4<v4i16, VPR64, ZIP2vvv_4h, NI_ei_i32>;
+def : NI_Zip2_v4<v4i32, VPR128, ZIP2vvv_4s, NI_ei_i32>;
+def : NI_Zip2_v4<v4f32, VPR128, ZIP2vvv_4s, NI_ei_f32>;
+
+// trn1
+def : Pat<(v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 VPR128:$Rn),
+          (v16i8 VPR128:$Rm), 0,  1)),
+          (v16i8 VPR128:$Rm), 2,  3)),
+          (v16i8 VPR128:$Rm), 4,  5)),
+          (v16i8 VPR128:$Rm), 6,  7)),
+          (v16i8 VPR128:$Rm), 8,  9)),
+          (v16i8 VPR128:$Rm), 10, 11)),
+          (v16i8 VPR128:$Rm), 12, 13)),
+          (v16i8 VPR128:$Rm), 14, 15)),
+          (TRN1vvv_16b VPR128:$Rn, VPR128:$Rm)>;
+
+class NI_Trn1_v8<ValueType Ty, RegisterOperand VPR, Instruction INST>
+  : Pat<(Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty VPR:$Rn),
+        (Ty VPR:$Rm), 0, 1)),
+        (Ty VPR:$Rm), 2, 3)),
+        (Ty VPR:$Rm), 4, 5)),
+        (Ty VPR:$Rm), 6, 7)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Trn1_v8<v8i8, VPR64, TRN1vvv_8b>;
+def : NI_Trn1_v8<v8i16, VPR128, TRN1vvv_8h>;
+
+class NI_Trn1_v4<ValueType Ty, RegisterOperand VPR, Instruction INST,
+                 PatFrag ei>
+  : Pat<(Ty (ei (Ty (ei
+        (Ty VPR:$Rn),
+        (Ty VPR:$Rm), 0, 1)),
+        (Ty VPR:$Rm), 2, 3)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Trn1_v4<v4i16, VPR64, TRN1vvv_4h, NI_ei_i32>;
+def : NI_Trn1_v4<v4i32, VPR128, TRN1vvv_4s, NI_ei_i32>;
+def : NI_Trn1_v4<v4f32, VPR128, TRN1vvv_4s, NI_ei_f32>;
+
+// trn2
+def : Pat<(v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 (NI_ei_i32 (v16i8 (NI_ei_i32
+          (v16i8 VPR128:$Rm),
+          (v16i8 VPR128:$Rn), 1,  0)),
+          (v16i8 VPR128:$Rn), 3,  2)),
+          (v16i8 VPR128:$Rn), 5,  4)),
+          (v16i8 VPR128:$Rn), 7,  6)),
+          (v16i8 VPR128:$Rn), 9,  8)),
+          (v16i8 VPR128:$Rn), 11, 10)),
+          (v16i8 VPR128:$Rn), 13, 12)),
+          (v16i8 VPR128:$Rn), 15, 14)),
+          (TRN2vvv_16b VPR128:$Rn, VPR128:$Rm)>;
+
+class NI_Trn2_v8<ValueType Ty, RegisterOperand VPR, Instruction INST>
+  : Pat<(Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32 (Ty (NI_ei_i32
+        (Ty VPR:$Rm),
+        (Ty VPR:$Rn), 1, 0)),
+        (Ty VPR:$Rn), 3, 2)),
+        (Ty VPR:$Rn), 5, 4)),
+        (Ty VPR:$Rn), 7, 6)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Trn2_v8<v8i8, VPR64, TRN2vvv_8b>;
+def : NI_Trn2_v8<v8i16, VPR128, TRN2vvv_8h>;
+
+class NI_Trn2_v4<ValueType Ty, RegisterOperand VPR, Instruction INST,
+                 PatFrag ei>
+  : Pat<(Ty (ei (Ty (ei
+        (Ty VPR:$Rm),
+        (Ty VPR:$Rn), 1, 0)),
+        (Ty VPR:$Rn), 3, 2)),
+        (INST VPR:$Rn, VPR:$Rm)>;
+
+def : NI_Trn2_v4<v4i16, VPR64, TRN2vvv_4h, NI_ei_i32>;
+def : NI_Trn2_v4<v4i32, VPR128, TRN2vvv_4s, NI_ei_i32>;
+def : NI_Trn2_v4<v4f32, VPR128, TRN2vvv_4s, NI_ei_f32>;
+
+// End of implementation for instruction class (Perm)
 
 // The followings are for instruction class (3V Diff)
 
@@ -4430,31 +4762,43 @@ def : Pat<(v2f64  (bitconvert (f128   FPR128:$src))), (v2f64 FPR128:$src)>;
 def neon_uimm0_bare : Operand<i64>,
                         ImmLeaf<i64, [{return Imm == 0;}]> {
   let ParserMatchClass = neon_uimm0_asmoperand;
-  let PrintMethod = "printNeonUImm8OperandBare";
+  let PrintMethod = "printUImmBareOperand";
 }
 
 def neon_uimm1_bare : Operand<i64>,
                         ImmLeaf<i64, [{(void)Imm; return true;}]> {
   let ParserMatchClass = neon_uimm1_asmoperand;
-  let PrintMethod = "printNeonUImm8OperandBare";
+  let PrintMethod = "printUImmBareOperand";
 }
 
 def neon_uimm2_bare : Operand<i64>,
                         ImmLeaf<i64, [{(void)Imm; return true;}]> {
   let ParserMatchClass = neon_uimm2_asmoperand;
-  let PrintMethod = "printNeonUImm8OperandBare";
+  let PrintMethod = "printUImmBareOperand";
 }
 
 def neon_uimm3_bare : Operand<i64>,
                         ImmLeaf<i64, [{(void)Imm; return true;}]> {
   let ParserMatchClass = uimm3_asmoperand;
-  let PrintMethod = "printNeonUImm8OperandBare";
+  let PrintMethod = "printUImmBareOperand";
 }
 
 def neon_uimm4_bare : Operand<i64>,
                         ImmLeaf<i64, [{(void)Imm; return true;}]> {
   let ParserMatchClass = uimm4_asmoperand;
-  let PrintMethod = "printNeonUImm8OperandBare";
+  let PrintMethod = "printUImmBareOperand";
+}
+
+def neon_uimm3 : Operand<i64>,
+                   ImmLeaf<i64, [{(void)Imm; return true;}]> {
+  let ParserMatchClass = uimm3_asmoperand;
+  let PrintMethod = "printUImmHexOperand";
+}
+
+def neon_uimm4 : Operand<i64>,
+                   ImmLeaf<i64, [{(void)Imm; return true;}]> {
+  let ParserMatchClass = uimm4_asmoperand;
+  let PrintMethod = "printUImmHexOperand";
 }
 
 class NeonI_INS_main<string asmop, string Res, ValueType ResTy,
@@ -4471,6 +4815,47 @@ class NeonI_INS_main<string asmop, string Res, ValueType ResTy,
   bits<4> Imm;
   let Constraints = "$src = $Rd";
 }
+
+// Bitwise Extract
+class NeonI_Extract<bit q, bits<2> op2, string asmop,
+                    string OpS, RegisterOperand OpVPR, Operand OpImm>
+  : NeonI_BitExtract<q, op2, (outs OpVPR:$Rd),
+                     (ins OpVPR:$Rn, OpVPR:$Rm, OpImm:$Index),
+                     asmop # "\t$Rd." # OpS # ", $Rn." # OpS # 
+                     ", $Rm." # OpS # ", $Index",
+                     [],
+                     NoItinerary>{
+  bits<4> Index;
+}
+
+def EXTvvvi_8b : NeonI_Extract<0b0, 0b00, "ext", "8b",
+                               VPR64, neon_uimm3> {
+  let Inst{14-11} = {0b0, Index{2}, Index{1}, Index{0}};
+}
+
+def EXTvvvi_16b: NeonI_Extract<0b1, 0b00, "ext", "16b",
+                               VPR128, neon_uimm4> {
+  let Inst{14-11} = Index;
+}
+
+class NI_Extract<ValueType OpTy, RegisterOperand OpVPR, Instruction INST,
+                 Operand OpImm>	
+  : Pat<(OpTy (Neon_vextract (OpTy OpVPR:$Rn), (OpTy OpVPR:$Rm),
+                                 (i64 OpImm:$Imm))),
+              (INST OpVPR:$Rn, OpVPR:$Rm, OpImm:$Imm)>;
+
+def : NI_Extract<v8i8,  VPR64,  EXTvvvi_8b,  neon_uimm3>;
+def : NI_Extract<v4i16, VPR64,  EXTvvvi_8b,  neon_uimm3>;
+def : NI_Extract<v2i32, VPR64,  EXTvvvi_8b,  neon_uimm3>;
+def : NI_Extract<v1i64, VPR64,  EXTvvvi_8b,  neon_uimm3>;
+def : NI_Extract<v2f32, VPR64,  EXTvvvi_8b,  neon_uimm3>;
+def : NI_Extract<v1f64, VPR64,  EXTvvvi_8b,  neon_uimm3>;
+def : NI_Extract<v16i8, VPR128, EXTvvvi_16b, neon_uimm4>;
+def : NI_Extract<v8i16, VPR128, EXTvvvi_16b, neon_uimm4>;
+def : NI_Extract<v4i32, VPR128, EXTvvvi_16b, neon_uimm4>;
+def : NI_Extract<v2i64, VPR128, EXTvvvi_16b, neon_uimm4>;
+def : NI_Extract<v4f32, VPR128, EXTvvvi_16b, neon_uimm4>;
+def : NI_Extract<v2f64, VPR128, EXTvvvi_16b, neon_uimm4>;
 
 // The followings are for instruction class (3V Elem)
 

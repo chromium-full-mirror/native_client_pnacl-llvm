@@ -12,10 +12,15 @@
 #include "llvm/Assembly/Parser.h"
 #include "llvm/Bitcode/NaCl/NaClReaderWriter.h"
 #include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm-c/Core.h"
+#include "llvm-c/IRReader.h"
 
 using namespace llvm;
 
@@ -143,3 +148,30 @@ Module *llvm::NaClParseIRFile(const std::string &Filename,
 }
 
 // @LOCALMOD-END
+
+//===----------------------------------------------------------------------===//
+// C API.
+//===----------------------------------------------------------------------===//
+
+LLVMBool LLVMParseIRInContext(LLVMContextRef ContextRef,
+                              LLVMMemoryBufferRef MemBuf, LLVMModuleRef *OutM,
+                              char **OutMessage) {
+  SMDiagnostic Diag;
+
+  *OutM = wrap(ParseIR(unwrap(MemBuf), Diag, *unwrap(ContextRef)));
+
+  if(!*OutM) {
+    if (OutMessage) {
+      std::string buf;
+      raw_string_ostream os(buf);
+
+      Diag.print(NULL, os, false);
+      os.flush();
+
+      *OutMessage = strdup(buf.c_str());
+    }
+    return 1;
+  }
+
+  return 0;
+}
