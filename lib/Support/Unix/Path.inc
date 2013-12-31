@@ -597,18 +597,6 @@ Path::createDirectoryOnDisk( bool create_parents, std::string* ErrMsg ) {
 }
 
 bool
-Path::createFileOnDisk(std::string* ErrMsg) {
-#if !defined(__native_client__)
-  // Create the file
-  int fd = ::creat(path.c_str(), S_IRUSR | S_IWUSR);
-  if (fd < 0)
-    return MakeErrMsg(ErrMsg, path + ": can't create file");
-  ::close(fd);
-#endif // (__native_client__)
-  return false;
-}
-
-bool
 Path::createTemporaryFileOnDisk(bool reuse_current, std::string* ErrMsg) {
   // Make this into a unique file name
   if (makeUnique( reuse_current, ErrMsg ))
