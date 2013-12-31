@@ -282,6 +282,11 @@ def MipsMemAsmOperand : AsmOperandClass {
   let ParserMethod = "parseMemOperand";
 }
 
+def PtrRegAsmOperand : AsmOperandClass {
+  let Name = "PtrReg";
+  let ParserMethod = "parsePtrReg";
+}
+
 // Address operand
 def mem : Operand<iPTR> {
   let PrintMethod = "printMemOperand";
@@ -300,6 +305,8 @@ def mem_ea : Operand<iPTR> {
 
 def PtrRC : Operand<iPTR> {
   let MIOperandInfo = (ops ptr_rc);
+  let DecoderMethod = "DecodePtrRegisterClass";
+  let ParserMatchClass = PtrRegAsmOperand;
 }
 
 // size operand of ext instruction
