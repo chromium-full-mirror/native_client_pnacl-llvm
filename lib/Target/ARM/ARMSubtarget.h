@@ -208,10 +208,6 @@ protected:
 
  public:
   enum {
-    isELF, isDarwin
-  } TargetType;
-
-  enum {
     ARM_ABI_APCS,
     ARM_ABI_AAPCS // ARM EABI
   } TargetABI;
