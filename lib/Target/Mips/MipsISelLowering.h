@@ -240,7 +240,14 @@ namespace llvm {
     /// arguments and inquire about calling convention information.
     class MipsCC {
     public:
-      MipsCC(CallingConv::ID CallConv, bool IsO32, CCState &Info);
+      enum SpecialCallingConvType {
+        Mips16RetHelperConv, NoSpecialCallingConv
+      };
+
+      MipsCC(
+        CallingConv::ID CallConv, bool IsO32, CCState &Info,
+        SpecialCallingConvType SpecialCallingConv = NoSpecialCallingConv);
+
 
       void analyzeCallOperands(const SmallVectorImpl<ISD::OutputArg> &Outs,
                                bool IsVarArg, bool IsSoftFloat,
@@ -312,9 +319,10 @@ namespace llvm {
       CCState &CCInfo;
       CallingConv::ID CallConv;
       bool IsO32;
+      SpecialCallingConvType SpecialCallingConv;
       SmallVector<ByValArgInfo, 2> ByValArgs;
     };
-
+  protected:
     // Subtarget Info
     const MipsSubtarget *Subtarget;
 
@@ -325,6 +333,8 @@ namespace llvm {
     // @LOCALMOD-END
 
   private:
+
+    MipsCC::SpecialCallingConvType getSpecialCallingConv(SDValue Callee) const;
     // Lower Operand helpers
     SDValue LowerCallResult(SDValue Chain, SDValue InFlag,
                             CallingConv::ID CallConv, bool isVarArg,
