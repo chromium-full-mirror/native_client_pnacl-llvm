@@ -341,7 +341,7 @@ bool DwarfDebug::isSubprogramContext(const MDNode *Context) {
   if (D.isSubprogram())
     return true;
   if (D.isType())
-    return isSubprogramContext(DIType(Context).getContext());
+    return isSubprogramContext(resolve(DIType(Context).getContext()));
   return false;
 }
 
@@ -2649,4 +2649,27 @@ void DwarfDebug::emitDebugStrDWO() {
 /// Find the MDNode for the given scope reference.
 DIScope DwarfDebug::resolve(DIScopeRef SRef) const {
   return SRef.resolve(TypeIdentifierMap);
+}
+
+// If the current node has a parent scope then return that,
+// else return an empty scope.
+DIScope DwarfDebug::getScopeContext(DIScope S) const {
+
+  if (S.isType())
+    return resolve(DIType(S).getContext());
+
+  if (S.isSubprogram())
+    return DISubprogram(S).getContext();
+
+  if (S.isLexicalBlock())
+    return DILexicalBlock(S).getContext();
+
+  if (S.isLexicalBlockFile())
+    return DILexicalBlockFile(S).getContext();
+
+  if (S.isNameSpace())
+    return DINameSpace(S).getContext();
+
+  assert((S.isFile() || S.isCompileUnit()) && "Unhandled type of scope.");
+  return DIScope();
 }
