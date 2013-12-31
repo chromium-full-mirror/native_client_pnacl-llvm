@@ -661,7 +661,11 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
     DEBUG(dbgs() << "Optimized vector-legalized selection DAG: BB#"
           << BlockNumber << " '" << BlockName << "'\n"; CurDAG->dump());
   }
+
+  CurDAG->NewNodesMustHaveLegalTypes = true;
+
   if (ViewLegalizeDAGs) CurDAG->viewGraph("legalize input for " + BlockName);
+
   {
     NamedRegionTimer T("DAG Legalization", GroupName, TimePassesIsEnabled);
     CurDAG->Legalize();
