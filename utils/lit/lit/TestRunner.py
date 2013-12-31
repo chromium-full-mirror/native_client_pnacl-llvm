@@ -3,10 +3,6 @@ import os, signal, subprocess, sys
 import re
 import platform
 import tempfile
-try:
-    from io import StringIO
-except ImportError:
-    from StringIO import StringIO
 
 import lit.ShUtil as ShUtil
 import lit.Test as Test
@@ -24,25 +20,6 @@ kUseCloseFDs = not kIsWindows
 
 # Use temporary files to replace /dev/null on Windows.
 kAvoidDevNull = kIsWindows
-
-def executeCommand(command, cwd=None, env=None):
-    # Close extra file handles on UNIX (on Windows this cannot be done while
-    # also redirecting input).
-    close_fds = not kIsWindows
-
-    p = subprocess.Popen(command, cwd=cwd,
-                         stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         env=env, close_fds=close_fds)
-    out,err = p.communicate()
-    exitCode = p.wait()
-
-    # Detect Ctrl-C in subprocess.
-    if exitCode == -signal.SIGINT:
-        raise KeyboardInterrupt
-
-    return out, err, exitCode
 
 def executeShCmd(cmd, cfg, cwd, results):
     if isinstance(cmd, ShUtil.Seq):
@@ -308,7 +285,8 @@ def executeScript(test, litConfig, tmpBase, commands, cwd):
             # run on clang with no real loss.
             command = litConfig.valgrindArgs + command
 
-    return executeCommand(command, cwd=cwd, env=test.config.environment)
+    return lit.util.executeCommand(command, cwd=cwd,
+                                   env=test.config.environment)
 
 def isExpectedFail(test, xfails):
     # Check if any of the xfails match an available feature or the target.
@@ -326,6 +304,25 @@ def isExpectedFail(test, xfails):
             return True
 
     return False
+
+def parseIntegratedTestScriptCommands(sourcepath):
+    """
+    parseIntegratedTestScriptCommands(source_path) -> commands
+
+    Parse the commands in an integrated test script file into a list of
+    (line_number, command_type, line).
+    """
+    line_number = 0
+    for ln in open(sourcepath):
+        line_number += 1
+        if 'RUN:' in ln:
+            yield (line_number, 'RUN', ln[ln.index('RUN:')+4:])
+        elif 'XFAIL:' in ln:
+            yield (line_number, 'XFAIL', ln[ln.index('XFAIL:') + 6:])
+        elif 'REQUIRES:' in ln:
+            yield (line_number, 'REQUIRES', ln[ln.index('REQUIRES:') + 9:])
+        elif 'END.' in ln:
+            yield (line_number, 'END', ln[ln.index('END.') + 4:])
 
 def parseIntegratedTestScript(test, normalize_slashes=False,
                               extra_substitutions=[]):
@@ -364,18 +361,22 @@ def parseIntegratedTestScript(test, normalize_slashes=False,
                           ('%T', tmpDir),
                           ('#_MARKER_#', '%')])
 
+    # "%/[STpst]" should be normalized.
+    substitutions.extend([
+            ('%/s', sourcepath.replace('\\', '/')),
+            ('%/S', sourcedir.replace('\\', '/')),
+            ('%/p', sourcedir.replace('\\', '/')),
+            ('%/t', tmpBase.replace('\\', '/') + '.tmp'),
+            ('%/T', tmpDir.replace('\\', '/')),
+            ])
+
     # Collect the test lines from the script.
     script = []
     xfails = []
     requires = []
-    line_number = 0
-    for ln in open(sourcepath):
-        line_number += 1
-        if 'RUN:' in ln:
-            # Isolate the command to run.
-            index = ln.index('RUN:')
-            ln = ln[index+4:]
-
+    for line_number, command_type, ln in \
+            parseIntegratedTestScriptCommands(sourcepath):
+        if command_type == 'RUN':
             # Trim trailing whitespace.
             ln = ln.rstrip()
 
@@ -393,16 +394,17 @@ def parseIntegratedTestScript(test, normalize_slashes=False,
                 script[-1] = script[-1][:-1] + ln
             else:
                 script.append(ln)
-        elif 'XFAIL:' in ln:
-            items = ln[ln.index('XFAIL:') + 6:].split(',')
-            xfails.extend([s.strip() for s in items])
-        elif 'REQUIRES:' in ln:
-            items = ln[ln.index('REQUIRES:') + 9:].split(',')
-            requires.extend([s.strip() for s in items])
-        elif 'END.' in ln:
-            # Check for END. lines.
-            if ln[ln.index('END.'):].strip() == 'END.':
+        elif command_type == 'XFAIL':
+            xfails.extend([s.strip() for s in ln.split(',')])
+        elif command_type == 'REQUIRES':
+            requires.extend([s.strip() for s in ln.split(',')])
+        elif command_type == 'END':
+            # END commands are only honored if the rest of the line is empty.
+            if not ln.strip():
                 break
+        else:
+            raise ValueError("unknown script command type: %r" % (
+                    command_type,))
 
     # Apply substitutions to the script.  Allow full regular
     # expression syntax.  Replace each matching occurrence of regular
@@ -439,23 +441,33 @@ def parseIntegratedTestScript(test, normalize_slashes=False,
     return script,isXFail,tmpBase,execdir
 
 def formatTestOutput(status, out, err, exitCode, script):
-    output = StringIO()
-    output.write(u"Script:\n")
-    output.write(u"--\n")
-    output.write(u'\n'.join(script))
-    output.write(u"\n--\n")
-    output.write(u"Exit Code: %r\n\n" % exitCode)
+    output = """\
+Script:
+--
+%s
+--
+Exit Code: %d
+
+""" % ('\n'.join(script), exitCode)
+
+    # Append the stdout, if present.
     if out:
-        output.write(u"Command Output (stdout):\n")
-        output.write(u"--\n")
-        output.write(unicode(out))
-        output.write(u"--\n")
+        output += """\
+Command Output (stdout):
+--
+%s
+--
+""" % (out,)
+
+    # Append the stderr, if present.
     if err:
-        output.write(u"Command Output (stderr):\n")
-        output.write(u"--\n")
-        output.write(unicode(err))
-        output.write(u"--\n")
-    return (status, output.getvalue())
+        output += """\
+Command Output (stderr):
+--
+%s
+--
+""" % (err,)
+    return (status, output)
 
 def executeShTest(test, litConfig, useExternalSh,
                   extra_substitutions=[]):
