@@ -242,11 +242,8 @@ let neverHasSideEffects = 1, isAsCheapAsAMove = 1, isMoveImm = 1,
 
 // Register loads.
 let canFoldAsLoad = 1, SimpleBDXLoad = 1 in {
-  defm L   : UnaryRXPair<"l", 0x58, 0xE358, load, GR32>;
-  def  LRL : UnaryRILPC<"lrl", 0xC4D, aligned_load, GR32>;
-
-  def LG   : UnaryRXY<"lg", 0xE304, load, GR64>;
-  def LGRL : UnaryRILPC<"lgrl", 0xC48, aligned_load, GR64>;
+  defm L : UnaryRXPair<"l", 0x58, 0xE358, load, GR32>;
+  def LG : UnaryRXY<"lg", 0xE304, load, GR64>;
 
   // These instructions are split after register allocation, so we don't
   // want a custom inserter.
@@ -255,16 +252,16 @@ let canFoldAsLoad = 1, SimpleBDXLoad = 1 in {
                       [(set GR128:$dst, (load bdxaddr20only128:$src))]>;
   }
 }
+let canFoldAsLoad = 1 in {
+  def LRL  : UnaryRILPC<"lrl",  0xC4D, aligned_load, GR32>;
+  def LGRL : UnaryRILPC<"lgrl", 0xC48, aligned_load, GR64>;
+}
 
 // Register stores.
 let SimpleBDXStore = 1 in {
-  let isCodeGenOnly = 1 in {
-    defm ST32   : StoreRXPair<"st", 0x50, 0xE350, store, GR32>;
-    def  STRL32 : StoreRILPC<"strl", 0xC4F, aligned_store, GR32>;
-  }
-
-  def STG   : StoreRXY<"stg", 0xE324, store, GR64>;
-  def STGRL : StoreRILPC<"stgrl", 0xC4B, aligned_store, GR64>;
+  let isCodeGenOnly = 1 in
+    defm ST32 : StoreRXPair<"st", 0x50, 0xE350, store, GR32>;
+  def STG : StoreRXY<"stg", 0xE324, store, GR64>;
 
   // These instructions are split after register allocation, so we don't
   // want a custom inserter.
@@ -273,6 +270,9 @@ let SimpleBDXStore = 1 in {
                        [(store GR128:$src, bdxaddr20only128:$dst)]>;
   }
 }
+let isCodeGenOnly = 1 in
+  def STRL32 : StoreRILPC<"strl", 0xC4F, aligned_store, GR32>;
+def STGRL : StoreRILPC<"stgrl", 0xC4B, aligned_store, GR64>;
 
 // 8-bit immediate stores to 8-bit fields.
 defm MVI : StoreSIPair<"mvi", 0x92, 0xEB52, truncstorei8, imm32zx8trunc>;
@@ -281,6 +281,12 @@ defm MVI : StoreSIPair<"mvi", 0x92, 0xEB52, truncstorei8, imm32zx8trunc>;
 def MVHHI : StoreSIL<"mvhhi", 0xE544, truncstorei16, imm32sx16trunc>;
 def MVHI  : StoreSIL<"mvhi",  0xE54C, store,         imm32sx16>;
 def MVGHI : StoreSIL<"mvghi", 0xE548, store,         imm64sx16>;
+
+// Memory-to-memory moves.
+let mayLoad = 1, mayStore = 1 in
+  def MVC : InstSS<0xD2, (outs), (ins bdladdr12onlylen8:$BDL1,
+                                      bdaddr12only:$BD2),
+                   "mvc\t$BDL1, $BD2", []>;
 
 //===----------------------------------------------------------------------===//
 // Sign extensions
@@ -744,14 +750,13 @@ def MLG : BinaryRXY<"mlg", 0xE386, z_umul_lohi64, GR128, load>;
 //===----------------------------------------------------------------------===//
 
 // Division and remainder, from registers.
-def DSGFR : BinaryRRE<"dsgfr", 0xB91D, null_frag,   GR128, GR32>;
+def DSGFR : BinaryRRE<"dsgfr", 0xB91D, z_sdivrem32, GR128, GR32>;
 def DSGR  : BinaryRRE<"dsgr",  0xB90D, z_sdivrem64, GR128, GR64>;
 def DLR   : BinaryRRE<"dlr",   0xB997, z_udivrem32, GR128, GR32>;
 def DLGR  : BinaryRRE<"dlgr",  0xB987, z_udivrem64, GR128, GR64>;
-defm : SXB<z_sdivrem64, GR128, DSGFR>;
 
 // Division and remainder, from memory.
-def DSGF : BinaryRXY<"dsgf", 0xE31D, z_sdivrem64, GR128, sextloadi32>;
+def DSGF : BinaryRXY<"dsgf", 0xE31D, z_sdivrem32, GR128, load>;
 def DSG  : BinaryRXY<"dsg",  0xE30D, z_sdivrem64, GR128, load>;
 def DL   : BinaryRXY<"dl",   0xE397, z_udivrem32, GR128, load>;
 def DLG  : BinaryRXY<"dlg",  0xE387, z_udivrem64, GR128, load>;
