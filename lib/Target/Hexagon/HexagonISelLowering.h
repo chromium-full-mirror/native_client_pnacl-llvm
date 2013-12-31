@@ -95,8 +95,6 @@ namespace llvm {
     virtual bool isTruncateFree(Type *Ty1, Type *Ty2) const;
     virtual bool isTruncateFree(EVT VT1, EVT VT2) const;
 
-    virtual bool allowTruncateForTailCall(Type *Ty1, Type *Ty2) const;
-
     virtual SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const;
 
     virtual const char *getTargetNodeName(unsigned Opcode) const;
