@@ -18696,7 +18696,7 @@ void X86TargetLowering::LowerAsmOperandForConstraint(SDValue Op,
 
 std::pair<unsigned, const TargetRegisterClass*>
 X86TargetLowering::getRegForInlineAsmConstraint(const std::string &Constraint,
-                                                EVT VT) const {
+                                                MVT VT) const {
   // First, see if this is a constraint that directly corresponds to an LLVM
   // register class.
   if (Constraint.size() == 1) {
@@ -18763,7 +18763,7 @@ X86TargetLowering::getRegForInlineAsmConstraint(const std::string &Constraint,
     case 'x':   // SSE_REGS if SSE1 allowed or AVX_REGS if AVX allowed
       if (!Subtarget->hasSSE1()) break;
 
-      switch (VT.getSimpleVT().SimpleTy) {
+      switch (VT.SimpleTy) {
       default: break;
       // Scalar SSE types.
       case MVT::f32:

@@ -10587,7 +10587,7 @@ ARMTargetLowering::getSingleConstraintMatchWeight(
 typedef std::pair<unsigned, const TargetRegisterClass*> RCPair;
 RCPair
 ARMTargetLowering::getRegForInlineAsmConstraint(const std::string &Constraint,
-                                                EVT VT) const {
+                                                MVT VT) const {
   if (Constraint.size() == 1) {
     // GCC ARM Constraint Letters
     switch (Constraint[0]) {
