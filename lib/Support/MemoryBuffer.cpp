@@ -285,7 +285,7 @@ static bool shouldUseMmap(int FD,
   // @LOCALMOD-END
   // We don't use mmap for small files because this can severely fragment our
   // address space.
-  if (MapSize < 4096*4)
+  if (MapSize < 4 * 4096 || MapSize < (unsigned)PageSize)
     return false;
 
   if (!RequiresNullTerminator)
