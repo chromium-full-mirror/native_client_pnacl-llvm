@@ -353,7 +353,7 @@ extern char &InstructionSimplifierID;
 // "block_weights" metadata.
 FunctionPass *createLowerExpectIntrinsicPass();
 
-FunctionPass *createNaClCcRewritePass(const TargetLowering *TLI = 0);
+
 } // End llvm namespace
 
 #endif
