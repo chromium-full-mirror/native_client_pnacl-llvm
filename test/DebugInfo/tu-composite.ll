@@ -3,14 +3,25 @@
 ; RUN: llc -filetype=obj -O0 < %s > %t
 ; RUN: llvm-dwarfdump -debug-dump=info %t | FileCheck %s
 ; CHECK: [[TYPE:.*]]: DW_TAG_structure_type
+; Make sure we correctly handle containing type of a struct being a type identifier.
 ; CHECK-NEXT: DW_AT_containing_type [DW_FORM_ref4]       (cu + {{.*}} => {[[TYPE]]})
+; CHECK-NEXT: DW_AT_name [DW_FORM_strp] {{.*}}= "C")
+
+; Make sure we correctly handle context of a subprogram being a type identifier.
 ; CHECK: [[SP:.*]]: DW_TAG_subprogram
+; CHECK: DW_AT_name [DW_FORM_strp] {{.*}}= "foo")
+; Make sure we correctly handle containing type of a subprogram being a type identifier.
 ; CHECK: DW_AT_containing_type [DW_FORM_ref4]       (cu + {{.*}} => {[[TYPE]]})
+; CHECK: DW_TAG_formal_parameter
+; CHECK: NULL
+; CHECK: NULL
+
 ; CHECK: [[TYPE2:.*]]: DW_TAG_structure_type
 ; CHECK: DW_TAG_structure_type
 ; CHECK: DW_AT_name [DW_FORM_strp] {{.*}}= "D")
 ; CHECK: DW_TAG_member
 ; CHECK: DW_AT_name [DW_FORM_strp] {{.*}}= "a") 
+; Make sure we correctly handle context of a struct being a type identifier.
 ; CHECK: DW_TAG_structure_type
 ; CHECK-NEXT: DW_AT_name [DW_FORM_strp] {{.*}}= "Nested")
 ; CHECK: DW_TAG_structure_type
@@ -18,17 +29,21 @@
 ; CHECK-NEXT: DW_AT_declaration [DW_FORM_flag]      (0x01)
 ; CHECK: DW_TAG_structure_type
 ; CHECK-NEXT: DW_AT_name [DW_FORM_strp] {{.*}}= "virt<bar>")
+; Make sure we correctly handle type of a template_type being a type identifier.
 ; CHECK: DW_TAG_template_type_parameter
 ; CHECK-NEXT: DW_AT_type [DW_FORM_ref4] (cu + {{.*}} => {[[TYPE2]]})
 ; CHECK-NEXT: DW_AT_name [DW_FORM_strp] {{.*}}= "T")
+; Make sure we correctly handle derived-from of a typedef being a type identifier.
 ; CHECK: DW_TAG_typedef
 ; CHECK-NEXT: DW_AT_type [DW_FORM_ref4] (cu + {{.*}} => {[[TYPE2]]})
 ; CHECK: DW_AT_name [DW_FORM_strp] {{.*}}= "baz2")
+; Make sure we correctly handle derived-from of a pointer type being a type identifier.
 ; CHECK: DW_TAG_pointer_type
 ; CHECK: DW_AT_type [DW_FORM_ref4] (cu + {{.*}} => {[[TYPE]]})
 ; CHECK: DW_TAG_typedef
 ; CHECK-NEXT: DW_AT_type [DW_FORM_ref4] (cu + {{.*}} => {[[TYPE2]]})
 ; CHECK: DW_AT_name [DW_FORM_strp] {{.*}}= "baz")
+; Make sure we correctly handle derived-from of an array type being a type identifier.
 ; CHECK: DW_TAG_array_type
 ; CHECK-NEXT: DW_AT_type [DW_FORM_ref4] (cu + {{.*}} => {[[TYPE2]]})
 ; IR generated from clang -g with the following source:
@@ -120,7 +135,7 @@ attributes #1 = { nounwind readnone }
 !10 = metadata !{i32 786453, i32 0, null, metadata !"", i32 0, i64 0, i64 0, i64 0, i32 0, null, metadata !11, i32 0, null, null, null} ; [ DW_TAG_subroutine_type ] [line 0, size 0, align 0, offset 0] [from ]
 !11 = metadata !{metadata !12}
 !12 = metadata !{i32 786468, null, null, metadata !"int", i32 0, i64 32, i64 32, i64 0, i32 0, i32 5} ; [ DW_TAG_base_type ] [int] [line 0, size 32, align 32, offset 0, enc DW_ATE_signed]
-!13 = metadata !{i32 786478, metadata !1, metadata !4, metadata !"foo", metadata !"foo", metadata !"_ZN1C3fooEv", i32 2, metadata !14, i1 false, i1 false, i32 1, i32 0, metadata !"_ZTS1C", i32 256, i1 false, null, null, i32 0, metadata !17, i32 2} ; [ DW_TAG_subprogram ] [line 2] [foo]
+!13 = metadata !{i32 786478, metadata !1, metadata !"_ZTS1C", metadata !"foo", metadata !"foo", metadata !"_ZN1C3fooEv", i32 2, metadata !14, i1 false, i1 false, i32 1, i32 0, metadata !"_ZTS1C", i32 256, i1 false, null, null, i32 0, metadata !17, i32 2} ; [ DW_TAG_subprogram ] [line 2] [foo]
 !14 = metadata !{i32 786453, i32 0, null, metadata !"", i32 0, i64 0, i64 0, i64 0, i32 0, null, metadata !15, i32 0, null, null, null} ; [ DW_TAG_subroutine_type ] [line 0, size 0, align 0, offset 0] [from ]
 !15 = metadata !{null, metadata !16}
 !16 = metadata !{i32 786447, null, null, metadata !"", i32 0, i64 64, i64 64, i64 0, i32 1088, metadata !"_ZTS1C"} ; [ DW_TAG_pointer_type ] [line 0, size 64, align 64, offset 0] [artificial] [from _ZTS1C]
