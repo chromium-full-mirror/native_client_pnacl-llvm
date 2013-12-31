@@ -983,10 +983,28 @@ bool BoUpSLP::isConsecutiveAccess(Value *A, Value *B) {
   if (PtrA->getType() != PtrB->getType())
     return false;
 
+  // Calculate a constant offset from the base pointer without using SCEV
+  // in the supported cases. 
+  // TODO: Add support for the case where one of the pointers is a GEP that
+  // uses the other pointer.
+  GetElementPtrInst *GepA = dyn_cast<GetElementPtrInst>(PtrA);
+  GetElementPtrInst *GepB = dyn_cast<GetElementPtrInst>(PtrB);
+  if (GepA && GepB && GepA->getPointerOperand() == GepB->getPointerOperand()) {
+    unsigned BW = DL->getPointerSizeInBits(ASA);
+    APInt OffsetA(BW, 0) ,OffsetB(BW, 0);
+
+    if (GepA->accumulateConstantOffset(*DL, OffsetA) &&
+        GepB->accumulateConstantOffset(*DL, OffsetB)) {
+      Type *Ty = cast<PointerType>(PtrA->getType())->getElementType();
+      int64_t Sz = DL->getTypeStoreSize(Ty);
+      return ((OffsetB.getSExtValue() - OffsetA.getSExtValue()) == Sz);
+    }
+  }
+
   // Calculate the distance.
   const SCEV *PtrSCEVA = SE->getSCEV(PtrA);
   const SCEV *PtrSCEVB = SE->getSCEV(PtrB);
-  const SCEV *OffsetSCEV = SE->getMinusSCEV(PtrSCEVA, PtrSCEVB);
+  const SCEV *OffsetSCEV = SE->getMinusSCEV(PtrSCEVB, PtrSCEVA);
   const SCEVConstant *ConstOffSCEV = dyn_cast<SCEVConstant>(OffsetSCEV);
 
   // Non constant distance.
@@ -995,10 +1013,10 @@ bool BoUpSLP::isConsecutiveAccess(Value *A, Value *B) {
 
   int64_t Offset = ConstOffSCEV->getValue()->getSExtValue();
   Type *Ty = cast<PointerType>(PtrA->getType())->getElementType();
-  // The Instructions are connsecutive if the size of the first load/store is
+  // The Instructions are consecutive if the size of the first load/store is
   // the same as the offset.
   int64_t Sz = DL->getTypeStoreSize(Ty);
-  return ((-Offset) == Sz);
+  return (Offset == Sz);
 }
 
 Value *BoUpSLP::getSinkBarrier(Instruction *Src, Instruction *Dst) {
