@@ -504,7 +504,7 @@ void X86Subtarget::initializeEnvironment() {
   HasHLE = false;
   HasERI = false;
   HasCDI = false;
-  HasPFI=false;
+  HasPFI = false;
   HasADX = false;
   HasPRFCHW = false;
   HasRDSEED = false;
