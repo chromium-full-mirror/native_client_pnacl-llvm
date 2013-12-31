@@ -17,7 +17,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/TimeValue.h"
-#include <set>
 #include <string>
 #include <vector>
 
@@ -233,17 +232,6 @@ namespace sys {
       /// @brief Determine if the path references a dynamic library.
       bool isDynamicLibrary() const;
 
-      /// This function determines if the path name in the object references a
-      /// native object file by looking at it's magic number. The term object
-      /// file is defined as "an organized collection of separate, named
-      /// sequences of binary data." This covers the obvious file formats such
-      /// as COFF and ELF, but it also includes llvm ir bitcode, archives,
-      /// libraries, etc...
-      /// @returns true if the file starts with the magic number for an object
-      /// file.
-      /// @brief Determine if the path references an object file.
-      bool isObjectFile() const;
-
       /// This function determines if the path name references an existing file
       /// or directory in the file system.
       /// @returns true if the pathname references an existing file or
@@ -273,15 +261,6 @@ namespace sys {
       /// @returns true if the file is S_ISREG.
       /// @brief Determines if the file is a regular file
       bool isRegularFile() const;
-
-      /// This function builds a list of paths that are the names of the
-      /// files and directories in a directory.
-      /// @returns true if an error occurs, true otherwise
-      /// @brief Build a list of directory's contents.
-      bool getDirectoryContents(
-        std::set<Path> &paths, ///< The resulting list of file & directory names
-        std::string* ErrMsg    ///< Optional place to return an error message.
-      ) const;
 
     /// @}
     /// @name Path Mutators
