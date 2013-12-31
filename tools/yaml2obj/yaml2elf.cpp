@@ -150,18 +150,21 @@ class ELFState {
   /// \brief The ELF file header.
   Elf_Ehdr &Header;
 
+  SectionNameToIdxMap &SN2I;
+
 public:
 
   ELFState(Elf_Ehdr &Header_, ContiguousBlobAccumulator &Accum,
-           unsigned DotStrtabSecNo_)
+           unsigned DotStrtabSecNo_, SectionNameToIdxMap &SN2I_)
       : DotStrtab(), DotStrtabSecNo(DotStrtabSecNo_),
-        SectionContentAccum(Accum), Header(Header_) {}
+        SectionContentAccum(Accum), Header(Header_), SN2I(SN2I_) {}
 
   unsigned getDotStrTabSecNo() const { return DotStrtabSecNo; }
   StringTableBuilder &getStringTable() { return DotStrtab; }
   ContiguousBlobAccumulator &getSectionContentAccum() {
     return SectionContentAccum;
   }
+  SectionNameToIdxMap &getSN2I() { return SN2I; }
 };
 } // end anonymous namespace
 
@@ -196,6 +199,15 @@ static void handleSymtabSectionHeader(
     if (!Sym.Name.empty())
       Symbol.st_name = State.getStringTable().addString(Sym.Name);
     Symbol.setBindingAndType(Sym.Binding, Sym.Type);
+    unsigned Index;
+    if (State.getSN2I().lookupSection(Sym.Section, Index)) {
+      errs() << "error: Unknown section referenced: '" << Sym.Section
+             << "' by YAML symbol " << Sym.Name << ".\n";
+      exit(1);
+    }
+    Symbol.st_shndx = Index;
+    Symbol.st_value = Sym.Value;
+    Symbol.st_size = Sym.Size;
     Syms.push_back(Symbol);
   }
 
@@ -252,8 +264,6 @@ static int writeELF(raw_ostream &OS, const ELFYAML::Object &Doc) {
   const size_t SectionContentBeginOffset =
       Header.e_ehsize + Header.e_shentsize * Header.e_shnum;
   ContiguousBlobAccumulator CBA(SectionContentBeginOffset);
-  ELFState<ELFT> State(Header, CBA, DotStrtabSecNo);
-
   SectionNameToIdxMap SN2I;
   for (unsigned i = 0, e = Sections.size(); i != e; ++i) {
     StringRef Name = Sections[i].Name;
@@ -266,6 +276,8 @@ static int writeELF(raw_ostream &OS, const ELFYAML::Object &Doc) {
       return 1;
     }
   }
+
+  ELFState<ELFT> State(Header, CBA, DotStrtabSecNo, SN2I);
 
   StringTableBuilder SHStrTab;
   std::vector<Elf_Shdr> SHeaders;

@@ -57,6 +57,9 @@ struct Symbol {
   StringRef Name;
   ELF_STB Binding;
   ELF_STT Type;
+  StringRef Section;
+  llvm::yaml::Hex64 Value;
+  llvm::yaml::Hex64 Size;
 };
 struct Section {
   StringRef Name;
