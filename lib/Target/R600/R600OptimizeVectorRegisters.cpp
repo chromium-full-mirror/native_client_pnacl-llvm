@@ -164,10 +164,8 @@ unsigned getReassignedChan(
     const std::vector<std::pair<unsigned, unsigned> > &RemapChan,
     unsigned Chan) {
   for (unsigned j = 0, je = RemapChan.size(); j < je; j++) {
-    if (RemapChan[j].first == Chan) {
+    if (RemapChan[j].first == Chan)
       return RemapChan[j].second;
-      break;
-    }
   }
   llvm_unreachable("Chan wasn't reassigned");
 }
@@ -200,11 +198,13 @@ MachineInstr *R600VectorRegMerger::RebuildVector(
         .addReg(SubReg)
         .addImm(Chan);
     UpdatedRegToChan[SubReg] = Chan;
-    for (std::vector<unsigned>::iterator RemoveIt = UpdatedUndef.begin(),
-        RemoveE = UpdatedUndef.end(); RemoveIt != RemoveE; ++ RemoveIt) {
-      if (*RemoveIt == Chan)
-        UpdatedUndef.erase(RemoveIt);
-    }
+    std::vector<unsigned>::iterator ChanPos =
+        std::find(UpdatedUndef.begin(), UpdatedUndef.end(), Chan);
+    if (ChanPos != UpdatedUndef.end())
+      UpdatedUndef.erase(ChanPos);
+    assert(std::find(UpdatedUndef.begin(), UpdatedUndef.end(), Chan) ==
+               UpdatedUndef.end() &&
+           "UpdatedUndef shouldn't contain Chan more than once!");
     DEBUG(dbgs() << "    ->"; Tmp->dump(););
     (void)Tmp;
     SrcVec = DstReg;
