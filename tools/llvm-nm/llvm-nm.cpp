@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/Bitcode/Archive.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Bitcode/NaCl/NaClReaderWriter.h" // @LOCALMOD
 #include "llvm/IRReader/IRReader.h"             // @LOCALMOD
