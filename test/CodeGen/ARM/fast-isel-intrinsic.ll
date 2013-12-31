@@ -1,8 +1,6 @@
 ; RUN: llc < %s -O0 -fast-isel-abort -relocation-model=dynamic-no-pic -mtriple=armv7-apple-ios | FileCheck %s --check-prefix=ARM
-; RUN: llc < %s -O0 -fast-isel-abort -relocation-model=dynamic-no-pic -mtriple=armv7-linux-gnueabi | FileCheck %s --check-prefix=ARM
 ; RUN: llc < %s -O0 -fast-isel-abort -relocation-model=dynamic-no-pic -mtriple=thumbv7-apple-ios | FileCheck %s --check-prefix=THUMB
 ; RUN: llc < %s -O0 -fast-isel-abort -relocation-model=dynamic-no-pic -mtriple=armv7-apple-ios -arm-long-calls | FileCheck %s --check-prefix=ARM-LONG
-; RUN: llc < %s -O0 -fast-isel-abort -relocation-model=dynamic-no-pic -mtriple=armv7-linux-gnueabi -arm-long-calls | FileCheck %s --check-prefix=ARM-LONG
 ; RUN: llc < %s -O0 -fast-isel-abort -relocation-model=dynamic-no-pic -mtriple=thumbv7-apple-ios -arm-long-calls | FileCheck %s --check-prefix=THUMB-LONG
 
 ; Note that some of these tests assume that relocations are either
@@ -19,11 +17,11 @@ define void @t1() nounwind ssp {
 ; ARM: add r0, r0, #5
 ; ARM: movw r1, #64
 ; ARM: movw r2, #10
-; ARM: and r1, r1, #255
+; ARM: uxtb r1, r1
 ; ARM: bl {{_?}}memset
 ; ARM-LONG: t1
-; ARM-LONG: {{(movw r3, :lower16:L_memset\$non_lazy_ptr)|(ldr r3, .LCPI)}}
-; ARM-LONG: {{(movt r3, :upper16:L_memset\$non_lazy_ptr)?}}
+; ARM-LONG: movw r3, :lower16:L_memset$non_lazy_ptr
+; ARM-LONG: movt r3, :upper16:L_memset$non_lazy_ptr
 ; ARM-LONG: ldr r3, [r3]
 ; ARM-LONG: blx r3
 ; THUMB: t1
@@ -34,11 +32,11 @@ define void @t1() nounwind ssp {
 ; THUMB: movt r1, #0
 ; THUMB: movs r2, #10
 ; THUMB: movt r2, #0
-; THUMB: and r1, r1, #255
+; THUMB: uxtb r1, r1
 ; THUMB: bl {{_?}}memset
 ; THUMB-LONG: t1
-; THUMB-LONG: {{(movw r0, :lower16:_?message1)|(ldr.n r0, .LCPI)}}
-; THUMB-LONG: {{(movt r0, :upper16:_?message1)|(ldr r0, \[r0\])}}
+; THUMB-LONG: movw r3, :lower16:L_memset$non_lazy_ptr
+; THUMB-LONG: movt r3, :upper16:L_memset$non_lazy_ptr
 ; THUMB-LONG: ldr r3, [r3]
 ; THUMB-LONG: blx r3
   call void @llvm.memset.p0i8.i32(i8* getelementptr inbounds ([60 x i8]* @message1, i32 0, i32 5), i8 64, i32 10, i32 4, i1 false)
@@ -60,8 +58,8 @@ define void @t2() nounwind ssp {
 ; ARM: ldr r1, [sp[[SLOT]]] @ 4-byte Reload
 ; ARM: bl {{_?}}memcpy
 ; ARM-LONG: t2
-; ARM-LONG: {{(movw r3, :lower16:L_memcpy\$non_lazy_ptr)|(ldr r3, .LCPI)}}
-; ARM-LONG: {{(movt r3, :upper16:L_memcpy\$non_lazy_ptr)?}}
+; ARM-LONG: movw r3, :lower16:L_memcpy$non_lazy_ptr
+; ARM-LONG: movt r3, :upper16:L_memcpy$non_lazy_ptr
 ; ARM-LONG: ldr r3, [r3]
 ; ARM-LONG: blx r3
 ; THUMB: t2
@@ -77,8 +75,8 @@ define void @t2() nounwind ssp {
 ; THUMB: ldr r1,  [sp[[SLOT]]] @ 4-byte Reload
 ; THUMB: bl {{_?}}memcpy
 ; THUMB-LONG: t2
-; THUMB-LONG: {{(movw r0, :lower16:L_temp\$non_lazy_ptr)|(ldr.n r0, .LCPI)}}
-; THUMB-LONG: {{(movt r0, :upper16:L_temp\$non_lazy_ptr)?}}
+; THUMB-LONG: movw r3, :lower16:L_memcpy$non_lazy_ptr
+; THUMB-LONG: movt r3, :upper16:L_memcpy$non_lazy_ptr
 ; THUMB-LONG: ldr r3, [r3]
 ; THUMB-LONG: blx r3
   call void @llvm.memcpy.p0i8.p0i8.i32(i8* getelementptr inbounds ([60 x i8]* @temp, i32 0, i32 4), i8* getelementptr inbounds ([60 x i8]* @temp, i32 0, i32 16), i32 17, i32 4, i1 false)
@@ -98,8 +96,8 @@ define void @t3() nounwind ssp {
 ; ARM: mov r0, r1
 ; ARM: bl {{_?}}memmove
 ; ARM-LONG: t3
-; ARM-LONG: {{(movw r0, :lower16:L_temp\$non_lazy_ptr)|(ldr r0, .LCPI)}}
-; ARM-LONG: {{(movt r0, :upper16:L_temp\$non_lazy_ptr)?}}
+; ARM-LONG: movw r3, :lower16:L_memmove$non_lazy_ptr
+; ARM-LONG: movt r3, :upper16:L_memmove$non_lazy_ptr
 ; ARM-LONG: ldr r3, [r3]
 ; ARM-LONG: blx r3
 ; THUMB: t3
@@ -115,8 +113,8 @@ define void @t3() nounwind ssp {
 ; THUMB: ldr r1,  [sp[[SLOT]]] @ 4-byte Reload
 ; THUMB: bl {{_?}}memmove
 ; THUMB-LONG: t3
-; THUMB-LONG: {{(movw r0, :lower16:L_temp\$non_lazy_ptr)|(ldr.n r0, .LCPI)}}
-; THUMB-LONG: {{(movt r0, :upper16:L_temp\$non_lazy_ptr)?}}
+; THUMB-LONG: movw r3, :lower16:L_memmove$non_lazy_ptr
+; THUMB-LONG: movt r3, :upper16:L_memmove$non_lazy_ptr
 ; THUMB-LONG: ldr r3, [r3]
 ; THUMB-LONG: blx r3
   call void @llvm.memmove.p0i8.p0i8.i32(i8* getelementptr inbounds ([60 x i8]* @temp, i32 0, i32 4), i8* getelementptr inbounds ([60 x i8]* @temp, i32 0, i32 16), i32 10, i32 1, i1 false)
