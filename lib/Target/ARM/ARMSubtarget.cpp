@@ -33,7 +33,7 @@ ReserveR9("arm-reserve-r9", cl::Hidden,
           cl::desc("Reserve R9, making it unavailable as GPR"));
 
 static cl::opt<bool>
-DarwinUseMOVT("arm-darwin-use-movt", cl::init(true), cl::Hidden);
+ArmUseMOVT("arm-use-movt", cl::init(true), cl::Hidden);
 
 // @LOCALMOD-START
 // TODO: * JITing has not been tested at all
@@ -180,12 +180,12 @@ void ARMSubtarget::resetSubtargetFeatures(StringRef CPU, StringRef FS) {
   if (isAAPCS_ABI())
     stackAlignment = 8;
 
+  UseMovt = hasV6T2Ops() && ArmUseMOVT;
+
   if (!isTargetIOS()) {
-    UseMovt = hasV6T2Ops();
     IsR9Reserved = ReserveR9;
   } else {
     IsR9Reserved = ReserveR9 | !HasV6Ops;
-    UseMovt = DarwinUseMOVT && hasV6T2Ops();
     SupportsTailCall = !getTargetTriple().isOSVersionLT(5, 0);
   }
 
