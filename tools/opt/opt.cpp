@@ -443,7 +443,7 @@ struct BreakpointPrinter : public ModulePass {
     AU.setPreservesAll();
   }
 };
- 
+
 } // anonymous namespace
 
 char BreakpointPrinter::ID = 0;
@@ -486,7 +486,7 @@ static void AddOptimizationPasses(PassManagerBase &MPM,FunctionPassManager &FPM,
   Builder.DisableUnitAtATime = !UnitAtATime;
   Builder.DisableUnrollLoops = (DisableLoopUnrolling.getNumOccurrences() > 0) ?
                                DisableLoopUnrolling : OptLevel == 0;
-  
+
   Builder.LoopVectorize = OptLevel > 1 && SizeLevel < 2;
   Builder.SLPVectorize = true;
 
