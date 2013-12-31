@@ -897,7 +897,7 @@ namespace llvm {
       TargetRegistry::RegisterMCAsmInfo(T, &Allocator);
     }
   private:
-    static MCAsmInfo *Allocator(const MCRegisterInfo &MRI, StringRef TT) {
+    static MCAsmInfo *Allocator(const MCRegisterInfo &/*MRI*/, StringRef TT) {
       return new MCAsmInfoImpl(TT);
     }
 
@@ -931,8 +931,9 @@ namespace llvm {
       TargetRegistry::RegisterMCCodeGenInfo(T, &Allocator);
     }
   private:
-    static MCCodeGenInfo *Allocator(StringRef TT, Reloc::Model RM,
-                                    CodeModel::Model CM, CodeGenOpt::Level OL) {
+    static MCCodeGenInfo *Allocator(StringRef /*TT*/, Reloc::Model /*RM*/,
+                                    CodeModel::Model /*CM*/,
+                                    CodeGenOpt::Level /*OL*/) {
       return new MCCodeGenInfoImpl();
     }
   };
@@ -1031,7 +1032,7 @@ namespace llvm {
       TargetRegistry::RegisterMCRegInfo(T, &Allocator);
     }
   private:
-    static MCRegisterInfo *Allocator(StringRef TT) {
+    static MCRegisterInfo *Allocator(StringRef /*TT*/) {
       return new MCRegisterInfoImpl();
     }
   };
@@ -1064,8 +1065,8 @@ namespace llvm {
       TargetRegistry::RegisterMCSubtargetInfo(T, &Allocator);
     }
   private:
-    static MCSubtargetInfo *Allocator(StringRef TT, StringRef CPU,
-                                      StringRef FS) {
+    static MCSubtargetInfo *Allocator(StringRef /*TT*/, StringRef /*CPU*/,
+                                      StringRef /*FS*/) {
       return new MCSubtargetInfoImpl();
     }
   };
@@ -1184,10 +1185,10 @@ namespace llvm {
     }
 
   private:
-    static MCCodeEmitter *Allocator(const MCInstrInfo &II,
-                                    const MCRegisterInfo &MRI,
-                                    const MCSubtargetInfo &STI,
-                                    MCContext &Ctx) {
+    static MCCodeEmitter *Allocator(const MCInstrInfo &/*II*/,
+                                    const MCRegisterInfo &/*MRI*/,
+                                    const MCSubtargetInfo &/*STI*/,
+                                    MCContext &/*Ctx*/) {
       return new MCCodeEmitterImpl();
     }
   };
