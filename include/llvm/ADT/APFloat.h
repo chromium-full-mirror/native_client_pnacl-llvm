@@ -21,9 +21,6 @@
 
 namespace llvm {
 
-/// A signed type to represent a floating point numbers unbiased exponent.
-typedef signed short exponent_t;
-
 struct fltSemantics;
 class APSInt;
 class StringRef;
@@ -124,6 +121,9 @@ enum lostFraction { // Example of truncated bits:
 ///
 class APFloat {
 public:
+
+  /// A signed type to represent a floating point numbers unbiased exponent.
+  typedef signed short ExponentType;
 
   /// \name Floating Point Semantics.
   /// @{
@@ -361,9 +361,6 @@ public:
   ///
   /// This implies that the current value of the float is not zero, subnormal,
   /// infinite, or NaN following the definition of normality from IEEE-754R.
-  ///
-  /// The current implementation of isNormal() differs from this by treating
-  /// subnormal values as normal values.
   bool isNormal() const { return !isDenormal() && isFiniteNonZero(); }
 
   /// Returns true if and only if the current value is zero, subnormal, or
@@ -555,7 +552,7 @@ private:
   } significand;
 
   /// The signed unbiased exponent of the value.
-  exponent_t exponent;
+  ExponentType exponent;
 
   /// What kind of floating point number this is.
   ///
