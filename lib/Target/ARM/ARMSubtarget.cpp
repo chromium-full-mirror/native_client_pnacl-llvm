@@ -121,6 +121,7 @@ void ARMSubtarget::initializeEnvironment() {
   FPOnlySP = false;
   HasPerfMon = false;
   HasTrustZone = false;
+  HasCrypto = false;
   AllowsUnalignedMem = false;
   Thumb2DSP = false;
   UseNaClTrap = false;
