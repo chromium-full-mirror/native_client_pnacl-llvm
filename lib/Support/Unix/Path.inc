@@ -185,25 +185,6 @@ Path::GetTemporaryDirectory(std::string *ErrMsg) {
 #endif
 }
 
-Path
-Path::GetCurrentDirectory() {
-  char pathname[MAXPATHLEN];
-  if (!getcwd(pathname, MAXPATHLEN)) {
-    // @LOCALMOD-BEGIN: Debug Mac SDK issues.
-    char error_buf[160];
-    if (snprintf(error_buf, sizeof(error_buf),
-                 "Failed to getcwd w/ MAXPATHLEN: %d\n", MAXPATHLEN) > 0)
-      perror(error_buf);
-    else
-      perror("Failed to getcwd");
-    // @LOCALMOD-END
-    assert(false && "Could not query current working directory.");
-    return Path();
-  }
-
-  return Path(pathname);
-}
-
 #if defined(__FreeBSD__) || defined (__NetBSD__) || defined(__Bitrig__) || \
     defined(__OpenBSD__) || defined(__minix) || defined(__FreeBSD_kernel__) || \
     defined(__linux__) || defined(__CYGWIN__)
