@@ -1160,8 +1160,8 @@ void DwarfDebug::endModule() {
 
   // Emit the pubnames and pubtypes sections if requested.
   if (HasDwarfPubSections) {
-    emitDebugPubNames(GenerateGnuPubSections ? true : false);
-    emitDebugPubTypes(GenerateGnuPubSections ? true : false);
+    emitDebugPubNames(GenerateGnuPubSections);
+    emitDebugPubTypes(GenerateGnuPubSections);
   }
 
   // Finally emit string information into a string table.
@@ -2322,23 +2322,11 @@ void DwarfDebug::emitAccelTypes() {
 // reference in the pubname header doesn't change.
 
 /// computeIndexValue - Compute the gdb index value for the DIE and CU.
-static uint8_t computeIndexValue(CompileUnit *CU, DIE *Die) {
-#define UPDATE_VALUE(CURRENT, VALUE)                                           \
-  {                                                                            \
-    (CURRENT) |= (((VALUE) & dwarf::GDB_INDEX_SYMBOL_KIND_MASK)                \
-                  << dwarf::GDB_INDEX_SYMBOL_KIND_SHIFT);                      \
-  }
-
-#define UPDATE_STATIC(CURRENT, IS_STATIC)                                      \
-  {                                                                            \
-    (CURRENT) |= (((IS_STATIC) & dwarf::GDB_INDEX_SYMBOL_STATIC_MASK)          \
-                  << dwarf::GDB_INDEX_SYMBOL_STATIC_SHIFT);                    \
-  }
-
-  // Compute the Attributes for the Die.
-  uint32_t Value = dwarf::GDB_INDEX_SYMBOL_KIND_NONE;
-  bool External =
-      Die->findAttribute(dwarf::DW_AT_external) != NULL ? true : false;
+static dwarf::PubIndexEntryDescriptor computeIndexValue(CompileUnit *CU,
+                                                        DIE *Die) {
+  dwarf::GDBIndexEntryLinkage IsStatic =
+      Die->findAttribute(dwarf::DW_AT_external) ? dwarf::GIEL_EXTERNAL
+                                                : dwarf::GIEL_STATIC;
 
   switch (Die->getTag()) {
   case dwarf::DW_TAG_class_type:
@@ -2348,33 +2336,20 @@ static uint8_t computeIndexValue(CompileUnit *CU, DIE *Die) {
   case dwarf::DW_TAG_typedef:
   case dwarf::DW_TAG_base_type:
   case dwarf::DW_TAG_subrange_type:
-    UPDATE_VALUE(Value, dwarf::GDB_INDEX_SYMBOL_KIND_TYPE);
-    UPDATE_STATIC(Value, 1);
-    break;
+    return dwarf::PubIndexEntryDescriptor(dwarf::GIEK_TYPE, dwarf::GIEL_STATIC);
   case dwarf::DW_TAG_namespace:
-    UPDATE_VALUE(Value, dwarf::GDB_INDEX_SYMBOL_KIND_TYPE);
-    break;
+    return dwarf::GIEK_TYPE;
   case dwarf::DW_TAG_subprogram:
-    UPDATE_VALUE(Value, dwarf::GDB_INDEX_SYMBOL_KIND_FUNCTION);
-    UPDATE_STATIC(Value, !External);
-    break;
+    return dwarf::PubIndexEntryDescriptor(dwarf::GIEK_FUNCTION, IsStatic);
   case dwarf::DW_TAG_constant:
   case dwarf::DW_TAG_variable:
-    UPDATE_VALUE(Value, dwarf::GDB_INDEX_SYMBOL_KIND_VARIABLE);
-    UPDATE_STATIC(Value, !External);
-    break;
+    return dwarf::PubIndexEntryDescriptor(dwarf::GIEK_VARIABLE, IsStatic);
   case dwarf::DW_TAG_enumerator:
-    UPDATE_VALUE(Value, dwarf::GDB_INDEX_SYMBOL_KIND_VARIABLE);
-    UPDATE_STATIC(Value, 1);
-    break;
+    return dwarf::PubIndexEntryDescriptor(dwarf::GIEK_VARIABLE,
+                                          dwarf::GIEL_STATIC);
   default:
-    break;
+    return dwarf::GIEK_NONE;
   }
-  // We don't need to add the CU into the bitmask for two reasons:
-  // a) the pubnames/pubtypes sections are per-cpu, and
-  // b) the linker wouldn't understand it anyhow.
-  // so go ahead and make it 1 byte by shifting it down.
-  return Value >> dwarf::GDB_INDEX_CU_BITSIZE;
 }
 
 /// emitDebugPubNames - Emit visible names into a debug pubnames section.
@@ -2427,7 +2402,7 @@ void DwarfDebug::emitDebugPubNames(bool GnuStyle) {
 
       if (GnuStyle) {
         Asm->OutStreamer.AddComment("Index value");
-        Asm->EmitInt8(computeIndexValue(TheCU, Entity));
+        Asm->EmitInt8(computeIndexValue(TheCU, Entity).toBits());
       }
 
       if (Asm->isVerbose())
@@ -2486,7 +2461,7 @@ void DwarfDebug::emitDebugPubTypes(bool GnuStyle) {
 
       if (GnuStyle) {
         Asm->OutStreamer.AddComment("Index value");
-        Asm->EmitInt8(computeIndexValue(TheCU, Entity));
+        Asm->EmitInt8(computeIndexValue(TheCU, Entity).toBits());
       }
 
       if (Asm->isVerbose())
