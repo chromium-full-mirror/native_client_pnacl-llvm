@@ -966,21 +966,13 @@ void DwarfDebug::collectDeadVariables() {
 typedef ArrayRef<uint8_t> HashValue;
 
 /// \brief Grabs the string in whichever attribute is passed in and returns
-/// a reference to it.
+/// a reference to it. Returns "" if the attribute doesn't exist.
 static StringRef getDIEStringAttr(DIE *Die, unsigned Attr) {
-  const SmallVectorImpl<DIEValue *> &Values = Die->getValues();
-  const DIEAbbrev &Abbrevs = Die->getAbbrev();
+  DIEValue *V = Die->findAttribute(Attr);
 
-  // Iterate through all the attributes until we find the one we're
-  // looking for, if we can't find it return an empty string.
-  for (size_t i = 0; i < Values.size(); ++i) {
-    if (Abbrevs.getData()[i].getAttribute() == Attr) {
-      DIEValue *V = Values[i];
-      assert(isa<DIEString>(V) && "String requested. Not a string.");
-      DIEString *S = cast<DIEString>(V);
-      return S->getString();
-    }
-  }
+  if (DIEString *S = dyn_cast_or_null<DIEString>(V))
+    return S->getString();
+
   return StringRef("");
 }
 
@@ -1092,6 +1084,14 @@ static bool isContainedInAnonNamespace(DIE *Die) {
   return false;
 }
 
+/// Test if the current CU language is C++ and that we have
+/// a named type that is not contained in an anonymous namespace.
+static bool shouldAddODRHash(CompileUnit *CU, DIE *Die) {
+  return (CU->getLanguage() == dwarf::DW_LANG_C_plus_plus &&
+          getDIEStringAttr(Die, dwarf::DW_AT_name) != "" &&
+          !isContainedInAnonNamespace(Die));
+}
+
 void DwarfDebug::finalizeModuleInfo() {
   // Collect info for variables that were optimized out.
   collectDeadVariables();
@@ -1113,13 +1113,9 @@ void DwarfDebug::finalizeModuleInfo() {
   for (unsigned i = 0, e = TypeUnits.size(); i != e; ++i) {
     MD5 Hash;
     DIE *Die = TypeUnits[i];
-    // If we've requested ODR hashes, the current language is C++, the type is
-    // named, and the type isn't located inside a C++ anonymous namespace then
-    // add the ODR signature attribute now.
-    if (GenerateODRHash &&
-        CUMap.begin()->second->getLanguage() == dwarf::DW_LANG_C_plus_plus &&
-        (getDIEStringAttr(Die, dwarf::DW_AT_name) != "") &&
-        !isContainedInAnonNamespace(Die))
+    // If we've requested ODR hashes and it's applicable for an ODR hash then
+    // add the ODR signature now.
+    if (GenerateODRHash && shouldAddODRHash(CUMap.begin()->second, Die))
       addDIEODRSignature(Hash, CUMap.begin()->second, Die);
   }
 
