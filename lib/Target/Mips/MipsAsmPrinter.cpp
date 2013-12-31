@@ -633,8 +633,8 @@ void MipsAsmPrinter::EmitEndOfAsmFile(Module &M) {
   // Emit Mips ELF register info
   Subtarget->getMReginfo().emitMipsReginfoSectionCG(
              OutStreamer, getObjFileLowering(), *Subtarget);
-  MipsELFStreamer *MES = cast<MipsELFStreamer>(&OutStreamer);
-  MES->emitELFHeaderFlagsCG(*Subtarget);
+  if (MipsELFStreamer *MES = dyn_cast<MipsELFStreamer>(&OutStreamer))
+    MES->emitELFHeaderFlagsCG(*Subtarget);
 }
 
 void MipsAsmPrinter::PrintDebugValueComment(const MachineInstr *MI,
