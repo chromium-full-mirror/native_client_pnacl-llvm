@@ -145,7 +145,7 @@ public:
     uint32_t Len = readInt() * 4;
     StringRef Str = Buffer->getBuffer().slice(Cursor, Cursor+Len);
     Cursor += Len;
-    return Str;
+    return Str.split('\0').first;
   }
 
   uint64_t getCursor() const { return Cursor; }
@@ -205,18 +205,18 @@ class GCOVLines {
 public:
   ~GCOVLines() { Lines.clear(); }
   void add(uint32_t N) { Lines.push_back(N); }
-  void collectLineCounts(FileInfo &FI, StringRef Filename, uint32_t Count);
+  void collectLineCounts(FileInfo &FI, StringRef Filename, uint64_t Count);
   void dump();
 
 private:
   SmallVector<uint32_t, 4> Lines;
 };
 
-typedef SmallVector<uint32_t, 16> LineCounts;
+typedef SmallVector<uint64_t, 16> LineCounts;
 class FileInfo {
 public:
-  void addLineCount(StringRef Filename, uint32_t Line, uint32_t Count);
-  void print();
+  void addLineCount(StringRef Filename, uint32_t Line, uint64_t Count);
+  void print(StringRef gcnoFile, StringRef gcdaFile);
 private:
   StringMap<LineCounts> LineInfo;
 };
