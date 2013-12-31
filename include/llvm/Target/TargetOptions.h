@@ -215,7 +215,7 @@ namespace llvm {
 
 bool operator==(const TargetOptions &LHS, const TargetOptions &RHS);
 
-bool operator!=(const TargetOptions &LHS, const TargetOptions &RHS) {
+static inline bool operator!=(const TargetOptions &LHS, const TargetOptions &RHS) {
   return !(LHS == RHS);
 }
 
