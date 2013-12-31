@@ -44,9 +44,8 @@
 
 using namespace llvm;
 
-ARMBaseRegisterInfo::ARMBaseRegisterInfo(const ARMBaseInstrInfo &tii,
-                                         const ARMSubtarget &sti)
-  : ARMGenRegisterInfo(ARM::LR, 0, 0, ARM::PC), TII(tii), STI(sti),
+ARMBaseRegisterInfo::ARMBaseRegisterInfo(const ARMSubtarget &sti)
+  : ARMGenRegisterInfo(ARM::LR, 0, 0, ARM::PC), STI(sti),
     FramePtr((STI.isTargetDarwin() || STI.isThumb()) ? ARM::R7 : ARM::R11),
     BasePtr(ARM::R6) {
 }
@@ -387,6 +386,7 @@ emitLoadConstPool(MachineBasicBlock &MBB,
   assert(!FlagSfiDisableCP && "unexpected call to emitLoadConstPool");
   // @LOCALMOD-END
   MachineFunction &MF = *MBB.getParent();
+  const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
   MachineConstantPool *ConstantPool = MF.getConstantPool();
   const Constant *C =
         ConstantInt::get(Type::getInt32Ty(MF.getFunction()->getContext()), Val);
@@ -568,9 +568,10 @@ materializeFrameBaseRegister(MachineBasicBlock *MBB,
   if (Ins != MBB->end())
     DL = Ins->getDebugLoc();
 
-  const MCInstrDesc &MCID = TII.get(ADDriOpc);
-  MachineRegisterInfo &MRI = MBB->getParent()->getRegInfo();
   const MachineFunction &MF = *MBB->getParent();
+  MachineRegisterInfo &MRI = MBB->getParent()->getRegInfo();
+  const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
+  const MCInstrDesc &MCID = TII.get(ADDriOpc);
   MRI.constrainRegClass(BaseReg, TII.getRegClass(MCID, 0, this, MF));
 
   MachineInstrBuilder MIB = AddDefaultPred(BuildMI(*MBB, Ins, DL, MCID, BaseReg)
@@ -586,6 +587,8 @@ ARMBaseRegisterInfo::resolveFrameIndex(MachineBasicBlock::iterator I,
   MachineInstr &MI = *I;
   MachineBasicBlock &MBB = *MI.getParent();
   MachineFunction &MF = *MBB.getParent();
+  const ARMBaseInstrInfo &TII =
+    *static_cast<const ARMBaseInstrInfo*>(MF.getTarget().getInstrInfo());
   ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
   int Off = Offset; // ARM doesn't need the general 64-bit offsets
   unsigned i = 0;
@@ -683,6 +686,8 @@ ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineInstr &MI = *II;
   MachineBasicBlock &MBB = *MI.getParent();
   MachineFunction &MF = *MBB.getParent();
+  const ARMBaseInstrInfo &TII =
+    *static_cast<const ARMBaseInstrInfo*>(MF.getTarget().getInstrInfo());
   const ARMFrameLowering *TFI =
     static_cast<const ARMFrameLowering*>(MF.getTarget().getFrameLowering());
   ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
