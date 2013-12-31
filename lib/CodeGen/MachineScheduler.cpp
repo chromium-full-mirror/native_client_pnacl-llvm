@@ -52,11 +52,6 @@ static cl::opt<unsigned> MISchedCutoff("misched-cutoff", cl::Hidden,
 static bool ViewMISchedDAGs = false;
 #endif // NDEBUG
 
-// FIXME: remove this flag after initial testing. It should always be a good
-// thing.
-static cl::opt<bool> EnableCopyConstrain("misched-vcopy", cl::Hidden,
-    cl::desc("Constrain vreg copies."), cl::init(true));
-
 static cl::opt<bool> EnableLoadCluster("misched-cluster", cl::Hidden,
   cl::desc("Enable load clustering."), cl::init(true));
 
@@ -1237,13 +1232,18 @@ public:
     ScheduleHazardRecognizer *HazardRec;
 
     unsigned CurrCycle;
-    unsigned IssueCount;
+    unsigned CurrMOps;
 
     /// MinReadyCycle - Cycle of the soonest available instruction.
     unsigned MinReadyCycle;
 
     // The expected latency of the critical path in this scheduled zone.
     unsigned ExpectedLatency;
+
+    // The latency of dependence chains leading into this zone.
+    // For each node scheduled: DLat = max DLat, N.Depth.
+    // For each cycle scheduled: DLat -= 1.
+    unsigned DependentLatency;
 
     // Resources used in the scheduled zone beyond this boundary.
     SmallVector<unsigned, 16> ResourceCounts;
@@ -1257,8 +1257,9 @@ public:
     unsigned ExpectedCount;
 
 #ifndef NDEBUG
-    // Remember the greatest min operand latency.
-    unsigned MaxMinLatency;
+    // Remember the greatest operand latency as an upper bound on the number of
+    // times we should retry the pending queue because of a hazard.
+    unsigned MaxObservedLatency;
 #endif
 
     void reset() {
@@ -1271,16 +1272,17 @@ public:
       NextSUs.clear();
       HazardRec = 0;
       CurrCycle = 0;
-      IssueCount = 0;
+      CurrMOps = 0;
       MinReadyCycle = UINT_MAX;
       ExpectedLatency = 0;
+      DependentLatency = 0;
       ResourceCounts.resize(1);
       assert(!ResourceCounts[0] && "nonzero count for bad resource");
       CritResIdx = 0;
       IsResourceLimited = false;
       ExpectedCount = 0;
 #ifndef NDEBUG
-      MaxMinLatency = 0;
+      MaxObservedLatency = 0;
 #endif
       // Reserve a zero-count for invalid CritResIdx.
       ResourceCounts.resize(1);
@@ -1421,6 +1423,10 @@ init(ScheduleDAGMI *DAG, const TargetSchedModel *SchedModel) {
       CritResIdx = PIdx;
     }
   }
+  DEBUG(dbgs() << "Critical Resource: "
+        << SchedModel->getProcResource(CritResIdx)->Name
+        << ": " << RemainingCounts[CritResIdx]
+        << " / " << SchedModel->getLatencyFactor() << '\n');
 }
 
 void ConvergingScheduler::SchedBoundary::
@@ -1461,13 +1467,15 @@ void ConvergingScheduler::releaseTopNode(SUnit *SU) {
 
   for (SUnit::pred_iterator I = SU->Preds.begin(), E = SU->Preds.end();
        I != E; ++I) {
+    if (I->isWeak())
+      continue;
     unsigned PredReadyCycle = I->getSUnit()->TopReadyCycle;
-    unsigned MinLatency = I->getMinLatency();
+    unsigned Latency = I->getLatency();
 #ifndef NDEBUG
-    Top.MaxMinLatency = std::max(MinLatency, Top.MaxMinLatency);
+    Top.MaxObservedLatency = std::max(Latency, Top.MaxObservedLatency);
 #endif
-    if (SU->TopReadyCycle < PredReadyCycle + MinLatency)
-      SU->TopReadyCycle = PredReadyCycle + MinLatency;
+    if (SU->TopReadyCycle < PredReadyCycle + Latency)
+      SU->TopReadyCycle = PredReadyCycle + Latency;
   }
   Top.releaseNode(SU, SU->TopReadyCycle);
 }
@@ -1483,12 +1491,12 @@ void ConvergingScheduler::releaseBottomNode(SUnit *SU) {
     if (I->isWeak())
       continue;
     unsigned SuccReadyCycle = I->getSUnit()->BotReadyCycle;
-    unsigned MinLatency = I->getMinLatency();
+    unsigned Latency = I->getLatency();
 #ifndef NDEBUG
-    Bot.MaxMinLatency = std::max(MinLatency, Bot.MaxMinLatency);
+    Bot.MaxObservedLatency = std::max(Latency, Bot.MaxObservedLatency);
 #endif
-    if (SU->BotReadyCycle < SuccReadyCycle + MinLatency)
-      SU->BotReadyCycle = SuccReadyCycle + MinLatency;
+    if (SU->BotReadyCycle < SuccReadyCycle + Latency)
+      SU->BotReadyCycle = SuccReadyCycle + Latency;
   }
   Bot.releaseNode(SU, SU->BotReadyCycle);
 }
@@ -1522,7 +1530,7 @@ bool ConvergingScheduler::SchedBoundary::checkHazard(SUnit *SU) {
     return HazardRec->getHazardType(SU) != ScheduleHazardRecognizer::NoHazard;
 
   unsigned uops = SchedModel->getNumMicroOps(SU->getInstr());
-  if ((IssueCount > 0) && (IssueCount + uops > SchedModel->getIssueWidth())) {
+  if ((CurrMOps > 0) && (CurrMOps + uops > SchedModel->getIssueWidth())) {
     DEBUG(dbgs() << "  SU(" << SU->NodeNum << ") uops="
           << SchedModel->getNumMicroOps(SU->getInstr()) << '\n');
     return true;
@@ -1532,16 +1540,20 @@ bool ConvergingScheduler::SchedBoundary::checkHazard(SUnit *SU) {
 
 /// Compute the remaining latency to determine whether ILP should be increased.
 void ConvergingScheduler::SchedBoundary::setLatencyPolicy(CandPolicy &Policy) {
+  DEBUG(dbgs() << "  " << Available.getName()
+        << " DependentLatency " << DependentLatency << '\n');
+
   // FIXME: compile time. In all, we visit four queues here one we should only
   // need to visit the one that was last popped if we cache the result.
-  unsigned RemLatency = 0;
+  unsigned RemLatency = DependentLatency;
   for (ReadyQueue::iterator I = Available.begin(), E = Available.end();
        I != E; ++I) {
     unsigned L = getUnscheduledLatency(*I);
-    DEBUG(dbgs() << "  " << Available.getName()
-          << " RemLatency SU(" << (*I)->NodeNum << ") " << L << '\n');
-    if (L > RemLatency)
+    if (L > RemLatency) {
+      DEBUG(dbgs() << "  " << Available.getName()
+            << " RemLatency SU(" << (*I)->NodeNum << ") " << L << '\n');
       RemLatency = L;
+    }
   }
   for (ReadyQueue::iterator I = Pending.begin(), E = Pending.end();
        I != E; ++I) {
@@ -1549,11 +1561,12 @@ void ConvergingScheduler::SchedBoundary::setLatencyPolicy(CandPolicy &Policy) {
     if (L > RemLatency)
       RemLatency = L;
   }
-  unsigned CriticalPathLimit = Rem->CriticalPath + SchedModel->getILPWindow();
+  unsigned CriticalPathLimit = Rem->CriticalPath;
   DEBUG(dbgs() << "  " << Available.getName()
         << " ExpectedLatency " << ExpectedLatency
         << " CP Limit " << CriticalPathLimit << '\n');
-  if (RemLatency + ExpectedLatency >= CriticalPathLimit
+
+  if (RemLatency + std::max(ExpectedLatency, CurrCycle) >= CriticalPathLimit
       && RemLatency > Rem->getMaxRemainingCount(SchedModel)) {
     Policy.ReduceLatency = true;
     DEBUG(dbgs() << "  Increase ILP: " << Available.getName() << '\n');
@@ -1580,14 +1593,18 @@ void ConvergingScheduler::SchedBoundary::releaseNode(SUnit *SU,
 /// Move the boundary of scheduled code by one cycle.
 void ConvergingScheduler::SchedBoundary::bumpCycle() {
   unsigned Width = SchedModel->getIssueWidth();
-  IssueCount = (IssueCount <= Width) ? 0 : IssueCount - Width;
+  CurrMOps = (CurrMOps <= Width) ? 0 : CurrMOps - Width;
 
   unsigned NextCycle = CurrCycle + 1;
   assert(MinReadyCycle < UINT_MAX && "MinReadyCycle uninitialized");
   if (MinReadyCycle > NextCycle) {
-    IssueCount = 0;
+    CurrMOps = 0;
     NextCycle = MinReadyCycle;
   }
+  if ((NextCycle - CurrCycle) > DependentLatency)
+    DependentLatency = 0;
+  else
+    DependentLatency -= (NextCycle - CurrCycle);
 
   if (!HazardRec->isEnabled()) {
     // Bypass HazardRec virtual calls.
@@ -1654,27 +1671,25 @@ void ConvergingScheduler::SchedBoundary::bumpNode(SUnit *SU) {
       countResource(PI->ProcResourceIdx, PI->Cycles);
     }
   }
-  if (isTop()) {
-    if (SU->getDepth() > ExpectedLatency)
-      ExpectedLatency = SU->getDepth();
-  }
-  else {
-    if (SU->getHeight() > ExpectedLatency)
-      ExpectedLatency = SU->getHeight();
-  }
+  unsigned &TopLatency = isTop() ? ExpectedLatency : DependentLatency;
+  unsigned &BotLatency = isTop() ? DependentLatency : ExpectedLatency;
+  if (SU->getDepth() > TopLatency)
+    TopLatency = SU->getDepth();
+  if (SU->getHeight() > BotLatency)
+    BotLatency = SU->getHeight();
 
   IsResourceLimited = getCriticalCount() > std::max(ExpectedLatency, CurrCycle);
 
   // Check the instruction group dispatch limit.
   // TODO: Check if this SU must end a dispatch group.
-  IssueCount += SchedModel->getNumMicroOps(SU->getInstr());
+  CurrMOps += SchedModel->getNumMicroOps(SU->getInstr());
 
   // checkHazard prevents scheduling multiple instructions per cycle that exceed
   // issue width. However, we commonly reach the maximum. In this case
   // opportunistically bump the cycle to avoid uselessly checking everything in
   // the readyQ. Furthermore, a single instruction may produce more than one
   // cycle's worth of micro-ops.
-  if (IssueCount >= SchedModel->getIssueWidth()) {
+  if (CurrMOps >= SchedModel->getIssueWidth()) {
     DEBUG(dbgs() << "  *** Max instrs at cycle " << CurrCycle << '\n');
     bumpCycle();
   }
@@ -1727,7 +1742,7 @@ SUnit *ConvergingScheduler::SchedBoundary::pickOnlyChoice() {
   if (CheckPending)
     releasePending();
 
-  if (IssueCount > 0) {
+  if (CurrMOps > 0) {
     // Defer any ready instrs that now have a hazard.
     for (ReadyQueue::iterator I = Available.begin(); I != Available.end();) {
       if (checkHazard(*I)) {
@@ -1739,7 +1754,7 @@ SUnit *ConvergingScheduler::SchedBoundary::pickOnlyChoice() {
     }
   }
   for (unsigned i = 0; Available.empty(); ++i) {
-    assert(i <= (HazardRec->getMaxLookAhead() + MaxMinLatency) &&
+    assert(i <= (HazardRec->getMaxLookAhead() + MaxObservedLatency) &&
            "permanent hazard"); (void)i;
     bumpCycle();
     releasePending();
@@ -2373,8 +2388,7 @@ static ScheduleDAGInstrs *createConvergingSched(MachineSchedContext *C) {
   // FIXME: extend the mutation API to allow earlier mutations to instantiate
   // data and pass it to later mutations. Have a single mutation that gathers
   // the interesting nodes in one pass.
-  if (EnableCopyConstrain)
-    DAG->addMutation(new CopyConstrain(DAG->TII, DAG->TRI));
+  DAG->addMutation(new CopyConstrain(DAG->TII, DAG->TRI));
   if (EnableLoadCluster)
     DAG->addMutation(new LoadClusterMutation(DAG->TII, DAG->TRI));
   if (EnableMacroFusion)
