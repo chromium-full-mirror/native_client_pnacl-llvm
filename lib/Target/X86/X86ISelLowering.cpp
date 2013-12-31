@@ -3918,12 +3918,10 @@ static bool isUNPCKLMask(ArrayRef<int> Mask, EVT VT,
   unsigned NumLanes = VT.getSizeInBits()/128;
   unsigned NumLaneElts = NumElts/NumLanes;
 
-  for (unsigned l = 0; l != NumLanes; ++l) {
-    for (unsigned i = l*NumLaneElts, j = l*NumLaneElts;
-         i != (l+1)*NumLaneElts;
-         i += 2, ++j) {
-      int BitI  = Mask[i];
-      int BitI1 = Mask[i+1];
+  for (unsigned l = 0; l != NumElts; l += NumLaneElts) {
+    for (unsigned i = 0, j = l; i != NumLaneElts; i += 2, ++j) {
+      int BitI  = Mask[l+i];
+      int BitI1 = Mask[l+i+1];
       if (!isUndefOrEqual(BitI, j))
         return false;
       if (V2IsSplat) {
@@ -3957,11 +3955,10 @@ static bool isUNPCKHMask(ArrayRef<int> Mask, EVT VT,
   unsigned NumLanes = VT.getSizeInBits()/128;
   unsigned NumLaneElts = NumElts/NumLanes;
 
-  for (unsigned l = 0; l != NumLanes; ++l) {
-    for (unsigned i = l*NumLaneElts, j = (l*NumLaneElts)+NumLaneElts/2;
-         i != (l+1)*NumLaneElts; i += 2, ++j) {
-      int BitI  = Mask[i];
-      int BitI1 = Mask[i+1];
+  for (unsigned l = 0; l != NumElts; l += NumLaneElts) {
+    for (unsigned i = 0, j = l+NumLaneElts/2; i != NumLaneElts; i += 2, ++j) {
+      int BitI  = Mask[l+i];
+      int BitI1 = Mask[l+i+1];
       if (!isUndefOrEqual(BitI, j))
         return false;
       if (V2IsSplat) {
@@ -4002,12 +3999,10 @@ static bool isUNPCKL_v_undef_Mask(ArrayRef<int> Mask, EVT VT, bool HasInt256) {
   unsigned NumLanes = VT.getSizeInBits()/128;
   unsigned NumLaneElts = NumElts/NumLanes;
 
-  for (unsigned l = 0; l != NumLanes; ++l) {
-    for (unsigned i = l*NumLaneElts, j = l*NumLaneElts;
-         i != (l+1)*NumLaneElts;
-         i += 2, ++j) {
-      int BitI  = Mask[i];
-      int BitI1 = Mask[i+1];
+  for (unsigned l = 0; l != NumElts; l += NumLaneElts) {
+    for (unsigned i = 0, j = l; i != NumLaneElts; i += 2, ++j) {
+      int BitI  = Mask[l+i];
+      int BitI1 = Mask[l+i+1];
 
       if (!isUndefOrEqual(BitI, j))
         return false;
@@ -4037,11 +4032,10 @@ static bool isUNPCKH_v_undef_Mask(ArrayRef<int> Mask, EVT VT, bool HasInt256) {
   unsigned NumLanes = VT.getSizeInBits()/128;
   unsigned NumLaneElts = NumElts/NumLanes;
 
-  for (unsigned l = 0; l != NumLanes; ++l) {
-    for (unsigned i = l*NumLaneElts, j = (l*NumLaneElts)+NumLaneElts/2;
-         i != (l+1)*NumLaneElts; i += 2, ++j) {
-      int BitI  = Mask[i];
-      int BitI1 = Mask[i+1];
+  for (unsigned l = 0; l != NumElts; l += NumLaneElts) {
+    for (unsigned i = 0, j = l+NumLaneElts/2; i != NumLaneElts; i += 2, ++j) {
+      int BitI  = Mask[l+i];
+      int BitI1 = Mask[l+i+1];
       if (!isUndefOrEqual(BitI, j))
         return false;
       if (!isUndefOrEqual(BitI1, j))
