@@ -104,6 +104,8 @@ bool BoUpSLP::isConsecutiveAccess(Value *A, Value *B) {
 }
 
 bool BoUpSLP::vectorizeStoreChain(ArrayRef<Value *> Chain, int CostThreshold) {
+  unsigned ChainLen = Chain.size();
+    DEBUG(dbgs()<<"SLP: Analyzing a store chain of length " <<ChainLen<< "\n");
   Type *StoreTy = cast<StoreInst>(Chain[0])->getValueOperand()->getType();
   unsigned Sz = DL->getTypeSizeInBits(StoreTy);
   unsigned VF = MinVecRegSize / Sz;
@@ -112,8 +114,8 @@ bool BoUpSLP::vectorizeStoreChain(ArrayRef<Value *> Chain, int CostThreshold) {
 
   bool Changed = false;
   // Look for profitable vectorizable trees at all offsets, starting at zero.
-  for (unsigned i = 0, e = Chain.size(); i < e; ++i) {
-    if (i + VF > e) return Changed;
+  for (unsigned i = 0, e = ChainLen; i < e; ++i) {
+    if (i + VF > e) break;
     DEBUG(dbgs()<<"SLP: Analyzing " << VF << " stores at offset "<< i << "\n");
     ArrayRef<Value *> Operands = Chain.slice(i, VF);
 
@@ -128,7 +130,19 @@ bool BoUpSLP::vectorizeStoreChain(ArrayRef<Value *> Chain, int CostThreshold) {
     }
   }
 
-  return Changed;
+  if (Changed)
+    return true;
+
+  int Cost = getTreeCost(Chain);
+  if (Cost < CostThreshold) {
+    DEBUG(dbgs() << "SLP: Found store chain cost = "<< Cost <<" for size = " <<
+          ChainLen << "\n");
+    Builder.SetInsertPoint(getInsertionPoint(getLastIndex(Chain, ChainLen)));
+    vectorizeTree(Chain, ChainLen);
+    return true;
+  }
+
+  return false;
 }
 
 bool BoUpSLP::vectorizeStores(ArrayRef<StoreInst *> Stores, int costThreshold) {
@@ -317,6 +331,34 @@ int BoUpSLP::getTreeCost(ArrayRef<Value *> VL) {
   return getTreeCost_rec(VL, 0);
 }
 
+static bool CanReuseExtract(ArrayRef<Value *> VL, unsigned VF,
+                            VectorType *VecTy) {
+  // Check if all of the extracts come from the same vector and from the
+  // correct offset.
+  Value *VL0 = VL[0];
+  ExtractElementInst *E0 = cast<ExtractElementInst>(VL0);
+  Value *Vec = E0->getOperand(0);
+
+  // We have to extract from the same vector type.
+  if (Vec->getType() != VecTy)
+    return false;
+
+  // Check that all of the indices extract from the correct offset.
+  ConstantInt *CI = dyn_cast<ConstantInt>(E0->getOperand(1));
+  if (!CI || CI->getZExtValue())
+    return false;
+
+  for (unsigned i = 1, e = VF; i < e; ++i) {
+    ExtractElementInst *E = cast<ExtractElementInst>(VL[i]);
+    ConstantInt *CI = dyn_cast<ConstantInt>(E->getOperand(1));
+
+    if (!CI || CI->getZExtValue() != i || E->getOperand(0) != Vec)
+      return false;
+  }
+
+  return true;
+}
+
 void BoUpSLP::getTreeUses_rec(ArrayRef<Value *> VL, unsigned Depth) {
   if (Depth == RecursionMaxDepth) return;
 
@@ -372,6 +414,12 @@ void BoUpSLP::getTreeUses_rec(ArrayRef<Value *> VL, unsigned Depth) {
   }
 
   switch (Opcode) {
+    case Instruction::ExtractElement: {
+      VectorType *VecTy = VectorType::get(VL[0]->getType(), VL.size());
+      // No need to follow ExtractElements that are going to be optimized away.
+      if (CanReuseExtract(VL, VL.size(), VecTy)) return;
+      // Fall through.
+    }
     case Instruction::ZExt:
     case Instruction::SExt:
     case Instruction::FPToUI:
@@ -509,6 +557,11 @@ int BoUpSLP::getTreeCost_rec(ArrayRef<Value *> VL, unsigned Depth) {
         TTI->getVectorInstrCost(Instruction::ExtractElement, VecTy, i);
 
   switch (Opcode) {
+  case Instruction::ExtractElement: {
+    if (CanReuseExtract(VL, VL.size(), VecTy))
+      return 0;
+    return getScalarizationCost(VecTy);
+  }
   case Instruction::ZExt:
   case Instruction::SExt:
   case Instruction::FPToUI:
@@ -772,6 +825,11 @@ Value *BoUpSLP::vectorizeTree_rec(ArrayRef<Value *> VL, int VF) {
   }
 
   switch (Opcode) {
+  case Instruction::ExtractElement: {
+    if (CanReuseExtract(VL, VL.size(), VecTy))
+      return VL0->getOperand(0);
+    return Scalarize(VL, VecTy);
+  }
   case Instruction::ZExt:
   case Instruction::SExt:
   case Instruction::FPToUI:
