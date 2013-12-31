@@ -40,8 +40,14 @@ void DWARFContext::dump(raw_ostream &OS, DIDumpType DumpType) {
       getCompileUnitAtIndex(i)->dump(OS);
   }
 
+  if (DumpType == DIDT_All || DumpType == DIDT_Types) {
+    OS << "\n.debug_types contents:\n";
+    for (unsigned i = 0, e = getNumTypeUnits(); i != e; ++i)
+      getTypeUnitAtIndex(i)->dump(OS);
+  }
+
   if (DumpType == DIDT_All || DumpType == DIDT_Loc) {
-    OS << ".debug_loc contents:\n";
+    OS << "\n.debug_loc contents:\n";
     getDebugLoc()->dump(OS);
   }
 
@@ -283,7 +289,29 @@ void DWARFContext::parseCompileUnits() {
       break;
     }
     CUs.push_back(CU.take());
-    offset = CUs.back()->getNextCompileUnitOffset();
+    offset = CUs.back()->getNextUnitOffset();
+  }
+}
+
+void DWARFContext::parseTypeUnits() {
+  const std::map<object::SectionRef, Section> &Sections = getTypesSections();
+  for (std::map<object::SectionRef, Section>::const_iterator
+           I = Sections.begin(),
+           E = Sections.end();
+       I != E; ++I) {
+    uint32_t offset = 0;
+    const DataExtractor &DIData =
+        DataExtractor(I->second.Data, isLittleEndian(), 0);
+    while (DIData.isValidOffset(offset)) {
+      OwningPtr<DWARFTypeUnit> TU(new DWARFTypeUnit(
+          getDebugAbbrev(), I->second.Data, getAbbrevSection(),
+          getRangeSection(), getStringSection(), StringRef(), getAddrSection(),
+          &I->second.Relocs, isLittleEndian()));
+      if (!TU->extract(DIData, &offset))
+        break;
+      TUs.push_back(TU.take());
+      offset = TUs.back()->getNextUnitOffset();
+    }
   }
 }
 
@@ -301,7 +329,7 @@ void DWARFContext::parseDWOCompileUnits() {
       break;
     }
     DWOCUs.push_back(DWOCU.take());
-    offset = DWOCUs.back()->getNextCompileUnitOffset();
+    offset = DWOCUs.back()->getNextUnitOffset();
   }
 }
 
@@ -400,7 +428,7 @@ DILineInfo DWARFContext::getLineInfoForAddress(uint64_t Address,
         CU->getInlinedChainForAddress(Address);
     if (InlinedChain.DIEs.size() > 0) {
       const DWARFDebugInfoEntryMinimal &TopFunctionDIE = InlinedChain.DIEs[0];
-      if (const char *Name = TopFunctionDIE.getSubroutineName(InlinedChain.CU))
+      if (const char *Name = TopFunctionDIE.getSubroutineName(InlinedChain.U))
         FunctionName = Name;
     }
   }
@@ -433,7 +461,7 @@ DILineInfoTable DWARFContext::getLineInfoForAddressRange(uint64_t Address,
         CU->getInlinedChainForAddress(Address);
     if (InlinedChain.DIEs.size() > 0) {
       const DWARFDebugInfoEntryMinimal &TopFunctionDIE = InlinedChain.DIEs[0];
-      if (const char *Name = TopFunctionDIE.getSubroutineName(InlinedChain.CU))
+      if (const char *Name = TopFunctionDIE.getSubroutineName(InlinedChain.U))
         FunctionName = Name;
     }
   }
@@ -492,7 +520,7 @@ DIInliningInfo DWARFContext::getInliningInfoForAddress(uint64_t Address,
     uint32_t Column = 0;
     // Get function name if necessary.
     if (Specifier.needs(DILineInfoSpecifier::FunctionName)) {
-      if (const char *Name = FunctionDIE.getSubroutineName(InlinedChain.CU))
+      if (const char *Name = FunctionDIE.getSubroutineName(InlinedChain.U))
         FunctionName = Name;
     }
     if (Specifier.needs(DILineInfoSpecifier::FileLineInfo)) {
@@ -516,7 +544,7 @@ DIInliningInfo DWARFContext::getInliningInfoForAddress(uint64_t Address,
       }
       // Get call file/line/column of a current DIE.
       if (i + 1 < n) {
-        FunctionDIE.getCallerFrame(InlinedChain.CU, CallFile, CallLine,
+        FunctionDIE.getCallerFrame(InlinedChain.U, CallFile, CallLine,
                                    CallColumn);
       }
     }
@@ -597,6 +625,8 @@ DWARFContextInMemory::DWARFContextInMemory(object::ObjectFile *Obj) :
         // FIXME: Use the other dwo range section when we emit it.
         RangeDWOSection = data;
       }
+    } else if (name == "debug_types") {
+      TypesSections[*i].Data = data;
     }
 
     section_iterator RelocatedSection = i->getRelocatedSection();
@@ -616,8 +646,11 @@ DWARFContextInMemory::DWARFContextInMemory(object::ObjectFile *Obj) :
         .Case("debug_info.dwo", &InfoDWOSection.Relocs)
         .Case("debug_line", &LineSection.Relocs)
         .Default(0);
-    if (!Map)
-      continue;
+    if (!Map) {
+      if (RelSecName != "debug_types")
+        continue;
+      Map = &TypesSections[*RelocatedSection].Relocs;
+    }
 
     if (i->begin_relocations() != i->end_relocations()) {
       uint64_t SectionSize;
