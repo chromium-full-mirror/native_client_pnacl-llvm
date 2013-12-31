@@ -69,6 +69,16 @@
 	aghi	%r0, 32768
 	aghi	%r0, foo
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: aghik	%r1, %r2, 3
+
+	aghik	%r1, %r2, 3
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: agrk	%r2,%r3,%r4
+
+	agrk	%r2,%r3,%r4
+
 #CHECK: error: invalid operand
 #CHECK: agsi	-524289, 0
 #CHECK: error: invalid operand
@@ -104,6 +114,11 @@
 	ahi	%r0, -32769
 	ahi	%r0, 32768
 	ahi	%r0, foo
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: ahik	%r1, %r2, 3
+
+	ahik	%r1, %r2, 3
 
 #CHECK: error: invalid operand
 #CHECK: ahy	%r0, -524289
@@ -145,6 +160,16 @@
 	alfi	%r0, -1
 	alfi	%r0, (1 << 32)
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: alghsik	%r1, %r2, 3
+
+	alghsik	%r1, %r2, 3
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: alhsik	%r1, %r2, 3
+
+	alhsik	%r1, %r2, 3
+
 #CHECK: error: invalid operand
 #CHECK: alg	%r0, -524289
 #CHECK: error: invalid operand
@@ -169,6 +194,16 @@
 	algfi	%r0, -1
 	algfi	%r0, (1 << 32)
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: algrk	%r2,%r3,%r4
+
+	algrk	%r2,%r3,%r4
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: alrk	%r2,%r3,%r4
+
+	alrk	%r2,%r3,%r4
+
 #CHECK: error: invalid operand
 #CHECK: aly	%r0, -524289
 #CHECK: error: invalid operand
@@ -176,6 +211,11 @@
 
 	aly	%r0, -524289
 	aly	%r0, 524288
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: ark	%r2,%r3,%r4
+
+	ark	%r2,%r3,%r4
 
 #CHECK: error: invalid operand
 #CHECK: asi	-524289, 0
@@ -1900,6 +1940,11 @@
 	ng	%r0, -524289
 	ng	%r0, 524288
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: ngrk	%r2,%r3,%r4
+
+	ngrk	%r2,%r3,%r4
+
 #CHECK: error: invalid operand
 #CHECK: ni	-1, 0
 #CHECK: error: invalid operand
@@ -1982,6 +2027,11 @@
 	niy	0, -1
 	niy	0, 256
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: nrk	%r2,%r3,%r4
+
+	nrk	%r2,%r3,%r4
+
 #CHECK: error: invalid operand
 #CHECK: ny	%r0, -524289
 #CHECK: error: invalid operand
@@ -2005,6 +2055,11 @@
 
 	og	%r0, -524289
 	og	%r0, 524288
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: ogrk	%r2,%r3,%r4
+
+	ogrk	%r2,%r3,%r4
 
 #CHECK: error: invalid operand
 #CHECK: oi	-1, 0
@@ -2087,6 +2142,11 @@
 	oiy	0(%r1,%r2), 0
 	oiy	0, -1
 	oiy	0, 256
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: ork	%r2,%r3,%r4
+
+	ork	%r2,%r3,%r4
 
 #CHECK: error: invalid operand
 #CHECK: oy	%r0, -524289
@@ -2244,6 +2304,11 @@
 	sgf	%r0, -524289
 	sgf	%r0, 524288
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: sgrk	%r2,%r3,%r4
+
+	sgrk	%r2,%r3,%r4
+
 #CHECK: error: invalid operand
 #CHECK: sh	%r0, -1
 #CHECK: error: invalid operand
@@ -2316,6 +2381,11 @@
 	slgfi	%r0, -1
 	slgfi	%r0, (1 << 32)
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: slgrk	%r2,%r3,%r4
+
+	slgrk	%r2,%r3,%r4
+
 #CHECK: error: invalid operand
 #CHECK: sll	%r0,-1
 #CHECK: error: invalid operand
@@ -2348,6 +2418,11 @@
 #CHECK: sllk	%r2,%r3,4(%r5)
 
 	sllk	%r2,%r3,4(%r5)
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: slrk	%r2,%r3,%r4
+
+	slrk	%r2,%r3,%r4
 
 #CHECK: error: invalid operand
 #CHECK: sly	%r0, -524289
@@ -2413,6 +2488,11 @@
 #CHECK: srak	%r2,%r3,4(%r5)
 
 	srak	%r2,%r3,4(%r5)
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: srk	%r2,%r3,%r4
+
+	srk	%r2,%r3,%r4
 
 #CHECK: error: invalid operand
 #CHECK: srl	%r0,-1
@@ -2636,6 +2716,11 @@
 	xg	%r0, -524289
 	xg	%r0, 524288
 
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: xgrk	%r2,%r3,%r4
+
+	xgrk	%r2,%r3,%r4
+
 #CHECK: error: invalid operand
 #CHECK: xi	-1, 0
 #CHECK: error: invalid operand
@@ -2685,6 +2770,11 @@
 	xiy	0(%r1,%r2), 0
 	xiy	0, -1
 	xiy	0, 256
+
+#CHECK: error: {{(instruction requires: distinct-ops)?}}
+#CHECK: xrk	%r2,%r3,%r4
+
+	xrk	%r2,%r3,%r4
 
 #CHECK: error: invalid operand
 #CHECK: xy	%r0, -524289
