@@ -16,7 +16,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/PathV1.h"
 #include "llvm/Support/Program.h"
 using namespace llvm;
 
@@ -66,18 +65,17 @@ StringRef llvm::DOT::getColorString(unsigned ColorNumber) {
   return Colors[ColorNumber % NumColors];
 }
 
-std::string llvm::createGraphFilename(const Twine &Name) {
-  std::string ErrMsg;
-  sys::Path Filename = sys::Path::GetTemporaryDirectory(&ErrMsg);
-  if (Filename.isEmpty()) {
-    errs() << "Error: " << ErrMsg << "\n";
+std::string llvm::createGraphFilename(const Twine &Name, int &FD) {
+  FD = -1;
+  SmallString<128> Filename;
+  error_code EC = sys::fs::unique_file(Twine(Name) + "-%%%%%%%.dot",
+                                       FD, Filename);
+  if (EC) {
+    errs() << "Error: " << EC.message() << "\n";
     return "";
   }
-  Filename.appendComponent((Name + ".dot").str());
-  if (Filename.makeUnique(true,&ErrMsg)) {
-    errs() << "Error: " << ErrMsg << "\n";
-    return "";
-  }
+
+  errs() << "Writing '" << Filename << "'... ";
   return Filename.str();
 }
 
@@ -139,9 +137,7 @@ void llvm::DisplayGraph(StringRef FilenameRef, bool wait,
 
 #elif (HAVE_GV && (HAVE_DOT || HAVE_FDP || HAVE_NEATO || \
                    HAVE_TWOPI || HAVE_CIRCO))
-  sys::Path PSFilename = sys::Path(Filename);
-  PSFilename.appendSuffix("ps");
-
+  std::string PSFilename = Filename + ".ps";
   std::string prog;
 
   // Set default grapher
@@ -206,7 +202,7 @@ void llvm::DisplayGraph(StringRef FilenameRef, bool wait,
   args.push_back(0);
 
   ErrMsg.clear();
-  if (!ExecGraphViewer(gv, args, PSFilename.str(), wait, ErrMsg))
+  if (!ExecGraphViewer(gv, args, PSFilename, wait, ErrMsg))
     return;
 
 #elif HAVE_DOTTY
