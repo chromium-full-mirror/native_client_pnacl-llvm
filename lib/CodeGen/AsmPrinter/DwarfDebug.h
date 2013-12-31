@@ -41,7 +41,6 @@ class DIEAbbrev;
 class DIE;
 class DIEBlock;
 class DIEEntry;
-class DwarfDebug;
 
 //===----------------------------------------------------------------------===//
 /// \brief This class is used to record source line correspondence.
@@ -388,7 +387,7 @@ class DwarfDebug {
   MCSymbol *DwarfAbbrevDWOSectionSym, *DwarfStrDWOSectionSym;
 
   // As an optimization, there is no need to emit an entry in the directory
-  // table for the same directory as DW_at_comp_dir.
+  // table for the same directory as DW_AT_comp_dir.
   StringRef CompilationDir;
 
   // Counter for assigning globally unique IDs for CUs.
@@ -402,6 +401,11 @@ class DwarfDebug {
 
   // Whether or not we're emitting info for older versions of gdb on darwin.
   bool IsDarwinGDBCompat;
+
+  // Holder for imported entities.
+  typedef SmallVector<std::pair<const MDNode *, const MDNode *>, 32>
+    ImportedEntityMap;
+  ImportedEntityMap ScopesWithImportedEntities;
 
   // DWARF5 Experimental Options
   bool HasDwarfAccelTables;
@@ -425,10 +429,6 @@ class DwarfDebug {
 
   // Holder for the skeleton information.
   DwarfUnits SkeletonHolder;
-
-  typedef SmallVector<std::pair<const MDNode *, const MDNode *>, 32>
-    ImportedEntityMap;
-  ImportedEntityMap ScopesWithImportedEntities;
 
 private:
 

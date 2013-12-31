@@ -439,11 +439,11 @@ DIE *DwarfDebug::constructLexicalScopeDIE(CompileUnit *TheCU,
   if (Scope->isAbstractScope())
     return ScopeDIE;
 
-  const SmallVector<InsnRange, 4> &Ranges = Scope->getRanges();
+  const SmallVectorImpl<InsnRange> &Ranges = Scope->getRanges();
   if (Ranges.empty())
     return 0;
 
-  SmallVector<InsnRange, 4>::const_iterator RI = Ranges.begin();
+  // If we have multiple ranges, emit them into the range section.
   if (Ranges.size() > 1) {
     // .debug_range section has not been laid out yet. Emit offset in
     // .debug_range as a uint, size 4, for now. emitDIE will handle
@@ -451,16 +451,20 @@ DIE *DwarfDebug::constructLexicalScopeDIE(CompileUnit *TheCU,
     TheCU->addUInt(ScopeDIE, dwarf::DW_AT_ranges, dwarf::DW_FORM_data4,
                    DebugRangeSymbols.size()
                    * Asm->getDataLayout().getPointerSize());
-    for (SmallVector<InsnRange, 4>::const_iterator RI = Ranges.begin(),
+    for (SmallVectorImpl<InsnRange>::const_iterator RI = Ranges.begin(),
          RE = Ranges.end(); RI != RE; ++RI) {
       DebugRangeSymbols.push_back(getLabelBeforeInsn(RI->first));
       DebugRangeSymbols.push_back(getLabelAfterInsn(RI->second));
     }
+
+    // Terminate the range list.
     DebugRangeSymbols.push_back(NULL);
     DebugRangeSymbols.push_back(NULL);
     return ScopeDIE;
   }
 
+  // Construct the address range for this DIE.
+  SmallVectorImpl<InsnRange>::const_iterator RI = Ranges.begin();
   MCSymbol *Start = getLabelBeforeInsn(RI->first);
   MCSymbol *End = getLabelAfterInsn(RI->second);
 
@@ -479,7 +483,7 @@ DIE *DwarfDebug::constructLexicalScopeDIE(CompileUnit *TheCU,
 // represent this concrete inlined copy of the function.
 DIE *DwarfDebug::constructInlinedScopeDIE(CompileUnit *TheCU,
                                           LexicalScope *Scope) {
-  const SmallVector<InsnRange, 4> &Ranges = Scope->getRanges();
+  const SmallVectorImpl<InsnRange> &Ranges = Scope->getRanges();
   assert(Ranges.empty() == false &&
          "LexicalScope does not have instruction markers!");
 
@@ -493,18 +497,6 @@ DIE *DwarfDebug::constructInlinedScopeDIE(CompileUnit *TheCU,
     return NULL;
   }
 
-  SmallVector<InsnRange, 4>::const_iterator RI = Ranges.begin();
-  MCSymbol *StartLabel = getLabelBeforeInsn(RI->first);
-  MCSymbol *EndLabel = getLabelAfterInsn(RI->second);
-
-  if (StartLabel == 0 || EndLabel == 0) {
-    llvm_unreachable("Unexpected Start and End labels for an inlined scope!");
-  }
-  assert(StartLabel->isDefined() &&
-         "Invalid starting label for an inlined scope!");
-  assert(EndLabel->isDefined() &&
-         "Invalid end label for an inlined scope!");
-
   DIE *ScopeDIE = new DIE(dwarf::DW_TAG_inlined_subroutine);
   TheCU->addDIEEntry(ScopeDIE, dwarf::DW_AT_abstract_origin,
                      dwarf::DW_FORM_ref4, OriginDIE);
@@ -516,7 +508,7 @@ DIE *DwarfDebug::constructInlinedScopeDIE(CompileUnit *TheCU,
     TheCU->addUInt(ScopeDIE, dwarf::DW_AT_ranges, dwarf::DW_FORM_data4,
                    DebugRangeSymbols.size()
                    * Asm->getDataLayout().getPointerSize());
-    for (SmallVector<InsnRange, 4>::const_iterator RI = Ranges.begin(),
+    for (SmallVectorImpl<InsnRange>::const_iterator RI = Ranges.begin(),
          RE = Ranges.end(); RI != RE; ++RI) {
       DebugRangeSymbols.push_back(getLabelBeforeInsn(RI->first));
       DebugRangeSymbols.push_back(getLabelAfterInsn(RI->second));
@@ -524,31 +516,46 @@ DIE *DwarfDebug::constructInlinedScopeDIE(CompileUnit *TheCU,
     DebugRangeSymbols.push_back(NULL);
     DebugRangeSymbols.push_back(NULL);
   } else {
+    SmallVectorImpl<InsnRange>::const_iterator RI = Ranges.begin();
+    MCSymbol *StartLabel = getLabelBeforeInsn(RI->first);
+    MCSymbol *EndLabel = getLabelAfterInsn(RI->second);
+
+    if (StartLabel == 0 || EndLabel == 0)
+      llvm_unreachable("Unexpected Start and End labels for an inlined scope!");
+
+    assert(StartLabel->isDefined() &&
+           "Invalid starting label for an inlined scope!");
+    assert(EndLabel->isDefined() && "Invalid end label for an inlined scope!");
+
     TheCU->addLabelAddress(ScopeDIE, dwarf::DW_AT_low_pc, StartLabel);
     TheCU->addLabelAddress(ScopeDIE, dwarf::DW_AT_high_pc, EndLabel);
   }
 
   InlinedSubprogramDIEs.insert(OriginDIE);
 
-  // Track the start label for this inlined function.
-  //.debug_inlined section specification does not clearly state how
-  // to emit inlined scope that is split into multiple instruction ranges.
-  // For now, use first instruction range and emit low_pc/high_pc pair and
-  // corresponding .debug_inlined section entry for this pair.
-  DenseMap<const MDNode *, SmallVector<InlineInfoLabels, 4> >::iterator
-    I = InlineInfo.find(InlinedSP);
-
-  if (I == InlineInfo.end()) {
-    InlineInfo[InlinedSP].push_back(std::make_pair(StartLabel, ScopeDIE));
-    InlinedSPNodes.push_back(InlinedSP);
-  } else
-    I->second.push_back(std::make_pair(StartLabel, ScopeDIE));
-
+  // Add the call site information to the DIE.
   DILocation DL(Scope->getInlinedAt());
   TheCU->addUInt(ScopeDIE, dwarf::DW_AT_call_file, 0,
                  getOrCreateSourceID(DL.getFilename(), DL.getDirectory(),
                                      TheCU->getUniqueID()));
   TheCU->addUInt(ScopeDIE, dwarf::DW_AT_call_line, 0, DL.getLineNumber());
+
+  // Track the start label for this inlined function.
+  //.debug_inlined section specification does not clearly state how
+  // to emit inlined scopes that are split into multiple instruction ranges.
+  // For now, use the first instruction range and emit low_pc/high_pc pair and
+  // corresponding the .debug_inlined section entry for this pair.
+  if (Asm->MAI->doesDwarfUseInlineInfoSection()) {
+    MCSymbol *StartLabel = getLabelBeforeInsn(Ranges.begin()->first);
+    DenseMap<const MDNode *, SmallVector<InlineInfoLabels, 4> >::iterator I =
+        InlineInfo.find(InlinedSP);
+
+    if (I == InlineInfo.end()) {
+      InlineInfo[InlinedSP].push_back(std::make_pair(StartLabel, ScopeDIE));
+      InlinedSPNodes.push_back(InlinedSP);
+    } else
+      I->second.push_back(std::make_pair(StartLabel, ScopeDIE));
+  }
 
   // Add name to the name table, we do this here because we're guaranteed
   // to have concrete versions of our DW_TAG_inlined_subprogram nodes.
@@ -582,14 +589,14 @@ DIE *DwarfDebug::constructScopeDIE(CompileUnit *TheCU, LexicalScope *Scope) {
         }
 
   // Collect lexical scope children first.
-  const SmallVector<DbgVariable *, 8> &Variables = ScopeVariables.lookup(Scope);
+  const SmallVectorImpl<DbgVariable *> &Variables =ScopeVariables.lookup(Scope);
   for (unsigned i = 0, N = Variables.size(); i < N; ++i)
     if (DIE *Variable =
         TheCU->constructVariableDIE(Variables[i], Scope->isAbstractScope())) {
       Children.push_back(Variable);
       if (Variables[i]->isObjectPointer()) ObjectPointer = Variable;
     }
-  const SmallVector<LexicalScope *, 4> &Scopes = Scope->getChildren();
+  const SmallVectorImpl<LexicalScope *> &Scopes = Scope->getChildren();
   for (unsigned j = 0, M = Scopes.size(); j < M; ++j)
     if (DIE *Nested = constructScopeDIE(TheCU, Scopes[j]))
       Children.push_back(Nested);
@@ -625,7 +632,7 @@ DIE *DwarfDebug::constructScopeDIE(CompileUnit *TheCU, LexicalScope *Scope) {
   if (!ScopeDIE) return NULL;
 
   // Add children
-  for (SmallVector<DIE *, 8>::iterator I = Children.begin(),
+  for (SmallVectorImpl<DIE *>::iterator I = Children.begin(),
          E = Children.end(); I != E; ++I)
     ScopeDIE->addChild(*I);
 
@@ -1092,7 +1099,7 @@ void DwarfDebug::endModule() {
          E = CUMap.end(); I != E; ++I)
     delete I->second;
 
-  for (SmallVector<CompileUnit *, 1>::iterator I = SkeletonCUs.begin(),
+  for (SmallVectorImpl<CompileUnit *>::iterator I = SkeletonCUs.begin(),
          E = SkeletonCUs.end(); I != E; ++I)
     delete *I;
 
@@ -1405,19 +1412,19 @@ void DwarfDebug::identifyScopeMarkers() {
   while (!WorkList.empty()) {
     LexicalScope *S = WorkList.pop_back_val();
 
-    const SmallVector<LexicalScope *, 4> &Children = S->getChildren();
+    const SmallVectorImpl<LexicalScope *> &Children = S->getChildren();
     if (!Children.empty())
-      for (SmallVector<LexicalScope *, 4>::const_iterator SI = Children.begin(),
+      for (SmallVectorImpl<LexicalScope *>::const_iterator SI = Children.begin(),
              SE = Children.end(); SI != SE; ++SI)
         WorkList.push_back(*SI);
 
     if (S->isAbstractScope())
       continue;
 
-    const SmallVector<InsnRange, 4> &Ranges = S->getRanges();
+    const SmallVectorImpl<InsnRange> &Ranges = S->getRanges();
     if (Ranges.empty())
       continue;
-    for (SmallVector<InsnRange, 4>::const_iterator RI = Ranges.begin(),
+    for (SmallVectorImpl<InsnRange>::const_iterator RI = Ranges.begin(),
            RE = Ranges.end(); RI != RE; ++RI) {
       assert(RI->first && "InsnRange does not have first instruction!");
       assert(RI->second && "InsnRange does not have second instruction!");
