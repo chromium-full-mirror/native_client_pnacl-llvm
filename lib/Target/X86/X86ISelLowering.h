@@ -915,16 +915,6 @@ namespace llvm {
     SDValue LowerNaClTargetArch(SDValue Op, SelectionDAG &DAG) const;
     // @LOCALMOD-END
 
-
-    // Utility functions to help LowerVECTOR_SHUFFLE & LowerBUILD_VECTOR
-    SDValue LowerVectorBroadcast(SDValue Op, SelectionDAG &DAG) const;
-    SDValue NormalizeVectorShuffle(SDValue Op, SelectionDAG &DAG) const;
-    SDValue buildFromShuffleMostly(SDValue Op, SelectionDAG &DAG) const;
-    
-    SDValue LowerVectorAllZeroTest(SDValue Op, SelectionDAG &DAG) const;
-
-    SDValue LowerVectorIntExtend(SDValue Op, SelectionDAG &DAG) const;
-
     virtual SDValue
       LowerFormalArguments(SDValue Chain,
                            CallingConv::ID CallConv, bool isVarArg,
