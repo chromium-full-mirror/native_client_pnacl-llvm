@@ -1313,7 +1313,7 @@ bool IfConverter::IfConvertDiamond(BBInfo &BBI, IfcvtKind Kind,
   // This is everything used+live in BB2 after the duplicated instructions. We
   // can compute this set by simulating liveness backwards from the end of BB2.
   LiveRegUnits DontKill;
-  for (MachineBasicBlock::reverse_instr_iterator I = BBI2->BB->rbegin(),
+  for (MachineBasicBlock::reverse_iterator I = BBI2->BB->rbegin(),
        E = MachineBasicBlock::reverse_iterator(DI2); I != E; ++I) {
     DontKill.StepBackward(*I, *TRI);
   }
