@@ -257,20 +257,22 @@ def : Pat<(PPCtc_return CTRRC8:$dst, imm:$imm),
 // 64-bit CR instructions
 let Interpretation64Bit = 1 in {
 let neverHasSideEffects = 1 in {
-def MTCRF8 : XFXForm_5<31, 144, (outs crbitm:$FXM), (ins g8rc:$rS),
+def MTOCRF8: XFXForm_5a<31, 144, (outs crbitm:$FXM), (ins g8rc:$ST),
+                        "mtocrf $FXM, $ST", BrMCRX>,
+            PPC970_DGroup_First, PPC970_Unit_CRU;
+
+def MTCRF8 : XFXForm_5<31, 144, (outs), (ins i32imm:$FXM, g8rc:$rS),
                       "mtcrf $FXM, $rS", BrMCRX>,
             PPC970_MicroCode, PPC970_Unit_CRU;
 
-let isCodeGenOnly = 1 in
-def MFCR8pseud: XFXForm_3<31, 19, (outs g8rc:$rT), (ins crbitm:$FXM),
-                       "#MFCR8pseud", SprMFCR>,
-            PPC970_MicroCode, PPC970_Unit_CRU;
-} // neverHasSideEffects = 1
+def MFOCRF8: XFXForm_5a<31, 19, (outs g8rc:$rT), (ins crbitm:$FXM),
+                        "mfocrf $rT, $FXM", SprMFCR>,
+             PPC970_DGroup_First, PPC970_Unit_CRU;
 
-let neverHasSideEffects = 1 in
 def MFCR8 : XFXForm_3<31, 19, (outs g8rc:$rT), (ins),
                      "mfcr $rT", SprMFCR>,
                      PPC970_MicroCode, PPC970_Unit_CRU;
+} // neverHasSideEffects = 1
 
 let hasSideEffects = 1, isBarrier = 1, usesCustomInserter = 1 in {
   def EH_SjLj_SetJmp64  : Pseudo<(outs gprc:$dst), (ins memr:$buf),

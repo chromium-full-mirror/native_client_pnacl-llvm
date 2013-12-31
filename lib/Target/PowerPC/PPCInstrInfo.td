@@ -1378,6 +1378,10 @@ def LFIWZX : XForm_25<31, 887, (outs f8rc:$frD), (ins memrr:$src),
                       [(set f64:$frD, (PPClfiwzx xoaddr:$src))]>;
 }
 
+// Load Multiple
+def LMW : DForm_1<46, (outs gprc:$rD), (ins memri:$src),
+                  "lmw $rD, $src", LdStLMW, []>;
+
 //===----------------------------------------------------------------------===//
 // PPC32 Store Instructions.
 //
@@ -1507,6 +1511,10 @@ def : Pat<(pre_store f32:$rS, iPTR:$ptrreg, iPTR:$ptroff),
           (STFSUX $rS, $ptrreg, $ptroff)>;
 def : Pat<(pre_store f64:$rS, iPTR:$ptrreg, iPTR:$ptroff),
           (STFDUX $rS, $ptrreg, $ptroff)>;
+
+// Store Multiple
+def STMW : DForm_1<47, (outs), (ins gprc:$rS, memri:$dst),
+                   "stmw $rS, $dst", LdStLMW, []>;
 
 def SYNC : XForm_24_sync<31, 598, (outs), (ins i32imm:$L),
                         "sync $L", LdStSync, []>;
@@ -1898,34 +1906,22 @@ def RESTORE_VRSAVE : Pseudo<(outs VRSAVERC:$vrsave), (ins memri:$F),
                      "#RESTORE_VRSAVE", []>;
 
 let neverHasSideEffects = 1 in {
-def MTCRF : XFXForm_5<31, 144, (outs crbitm:$FXM), (ins gprc:$rS),
-                      "mtcrf $FXM, $rS", BrMCRX>,
-            PPC970_MicroCode, PPC970_Unit_CRU;
+def MTOCRF: XFXForm_5a<31, 144, (outs crbitm:$FXM), (ins gprc:$ST),
+                       "mtocrf $FXM, $ST", BrMCRX>,
+            PPC970_DGroup_First, PPC970_Unit_CRU;
 
-// This is a pseudo for MFCR, which implicitly uses all 8 of its subregisters;
-// declaring that here gives the local register allocator problems with this:
-//  vreg = MCRF  CR0
-//  MFCR  <kill of whatever preg got assigned to vreg>
-// while not declaring it breaks DeadMachineInstructionElimination.
-// As it turns out, in all cases where we currently use this,
-// we're only interested in one subregister of it.  Represent this in the
-// instruction to keep the register allocator from becoming confused.
-//
-// FIXME: Make this a real Pseudo instruction when the JIT switches to MC.
-let isCodeGenOnly = 1 in
-def MFCRpseud: XFXForm_3<31, 19, (outs gprc:$rT), (ins crbitm:$FXM),
-                       "#MFCRpseud", SprMFCR>,
+def MTCRF : XFXForm_5<31, 144, (outs), (ins i32imm:$FXM, gprc:$rS),
+                      "mtcrf $FXM, $rS", BrMCRX>,
             PPC970_MicroCode, PPC970_Unit_CRU;
 
 def MFOCRF: XFXForm_5a<31, 19, (outs gprc:$rT), (ins crbitm:$FXM),
                        "mfocrf $rT, $FXM", SprMFCR>,
             PPC970_DGroup_First, PPC970_Unit_CRU;
-} // neverHasSideEffects = 1
 
-let neverHasSideEffects = 1 in
 def MFCR : XFXForm_3<31, 19, (outs gprc:$rT), (ins),
                      "mfcr $rT", SprMFCR>,
                      PPC970_MicroCode, PPC970_Unit_CRU;
+} // neverHasSideEffects = 1
 
 // Pseudo instruction to perform FADD in round-to-zero mode.
 let usesCustomInserter = 1, Uses = [RM] in {
@@ -2337,6 +2333,8 @@ def : InstAlias<"mr. $rA, $rB", (OR8o g8rc:$rA, g8rc:$rB, g8rc:$rB)>;
 
 def : InstAlias<"not $rA, $rB", (NOR8 g8rc:$rA, g8rc:$rB, g8rc:$rB)>;
 def : InstAlias<"not. $rA, $rB", (NOR8o g8rc:$rA, g8rc:$rB, g8rc:$rB)>;
+
+def : InstAlias<"mtcr $rA", (MTCRF8 255, g8rc:$rA)>;
 
 def LAx : PPCAsmPseudo<"la $rA, $addr", (ins gprc:$rA, memri:$addr)>;
 
