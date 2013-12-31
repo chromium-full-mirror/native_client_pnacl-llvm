@@ -120,6 +120,19 @@ static void zero(T &Obj) {
   memset(&Obj, 0, sizeof(Obj));
 }
 
+/// \brief Create a string table in `SHeader`, which we assume is already
+/// zero'd.
+template <class Elf_Shdr>
+static void createStringTableSectionHeader(Elf_Shdr &SHeader,
+                                           StringTableBuilder &STB,
+                                           ContiguousBlobAccumulator &CBA) {
+  SHeader.sh_type = ELF::SHT_STRTAB;
+  SHeader.sh_offset = CBA.currentOffset();
+  SHeader.sh_size = STB.size();
+  STB.writeToStream(CBA.getOS());
+  SHeader.sh_addralign = 1;
+}
+
 template <class ELFT>
 static int writeELF(raw_ostream &OS, const ELFYAML::Object &Doc) {
   using namespace llvm::ELF;
@@ -160,6 +173,8 @@ static int writeELF(raw_ostream &OS, const ELFYAML::Object &Doc) {
     ELFYAML::Section S;
     S.Type = SHT_NULL;
     zero(S.Flags);
+    zero(S.Address);
+    zero(S.AddressAlign);
     Sections.insert(Sections.begin(), S);
   }
   // "+ 1" for string table.
@@ -179,7 +194,7 @@ static int writeELF(raw_ostream &OS, const ELFYAML::Object &Doc) {
     }
   }
 
-  StringTableBuilder StrTab;
+  StringTableBuilder SHStrTab;
   SmallVector<char, 128> Buf;
   // XXX: This offset is tightly coupled with the order that we write
   // things to `OS`.
@@ -191,7 +206,7 @@ static int writeELF(raw_ostream &OS, const ELFYAML::Object &Doc) {
     const ELFYAML::Section &Sec = Sections[i];
     Elf_Shdr SHeader;
     zero(SHeader);
-    SHeader.sh_name = StrTab.addString(Sec.Name);
+    SHeader.sh_name = SHStrTab.addString(Sec.Name);
     SHeader.sh_type = Sec.Type;
     SHeader.sh_flags = Sec.Flags;
     SHeader.sh_addr = Sec.Address;
@@ -215,24 +230,14 @@ static int writeELF(raw_ostream &OS, const ELFYAML::Object &Doc) {
     SHeaders.push_back(SHeader);
   }
 
-  // String table header.
-  Elf_Shdr StrTabSHeader;
-  zero(StrTabSHeader);
-  StrTabSHeader.sh_name = 0;
-  StrTabSHeader.sh_type = SHT_STRTAB;
-  StrTabSHeader.sh_flags = 0;
-  StrTabSHeader.sh_addr = 0;
-  StrTabSHeader.sh_offset = CBA.currentOffset();
-  StrTabSHeader.sh_size = StrTab.size();
-  StrTab.writeToStream(CBA.getOS());
-  StrTabSHeader.sh_link = 0;
-  StrTabSHeader.sh_info = 0;
-  StrTabSHeader.sh_addralign = 1;
-  StrTabSHeader.sh_entsize = 0;
+  // Section header string table header.
+  Elf_Shdr SHStrTabSHeader;
+  zero(SHStrTabSHeader);
+  createStringTableSectionHeader(SHStrTabSHeader, SHStrTab, CBA);
 
   OS.write((const char *)&Header, sizeof(Header));
   writeVectorData(OS, SHeaders);
-  OS.write((const char *)&StrTabSHeader, sizeof(StrTabSHeader));
+  OS.write((const char *)&SHStrTabSHeader, sizeof(SHStrTabSHeader));
   CBA.writeBlobToStream(OS);
   return 0;
 }
