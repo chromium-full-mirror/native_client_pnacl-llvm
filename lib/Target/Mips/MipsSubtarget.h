@@ -193,6 +193,8 @@ public:
 
   bool hasStandardEncoding() const { return !inMips16Mode(); }
 
+  bool mipsSEUsesSoftFloat() const;
+
   bool enableLongBranchPass() const {
     return hasStandardEncoding() || allowMixed16_32();
   }
