@@ -1403,6 +1403,9 @@ void X86TargetLowering::resetOperationActions() {
     setOperationAction(ISD::AND,                MVT::v8i64, Legal);
     setOperationAction(ISD::OR,                 MVT::v8i64, Legal);
     setOperationAction(ISD::XOR,                MVT::v8i64, Legal);
+    setOperationAction(ISD::AND,                MVT::v16i32, Legal);
+    setOperationAction(ISD::OR,                 MVT::v16i32, Legal);
+    setOperationAction(ISD::XOR,                MVT::v16i32, Legal);
 
     // Custom lower several nodes.
     for (int i = MVT::FIRST_VECTOR_VALUETYPE;
@@ -1422,14 +1425,6 @@ void X86TargetLowering::resetOperationActions() {
       if (!VT.is512BitVector())
         continue;
 
-      if (VT != MVT::v8i64) {
-        setOperationAction(ISD::XOR,   VT, Promote);
-        AddPromotedToType (ISD::XOR,   VT, MVT::v8i64);
-        setOperationAction(ISD::OR,    VT, Promote);
-        AddPromotedToType (ISD::OR,    VT, MVT::v8i64);
-        setOperationAction(ISD::AND,   VT, Promote);
-        AddPromotedToType (ISD::AND,   VT, MVT::v8i64);
-      }
       if ( EltSize >= 32) {
         setOperationAction(ISD::VECTOR_SHUFFLE,      VT, Custom);
         setOperationAction(ISD::INSERT_VECTOR_ELT,   VT, Custom);
