@@ -823,6 +823,7 @@ void DwarfDebug::beginModule() {
   NamedMDNode *CU_Nodes = M->getNamedMetadata("llvm.dbg.cu");
   if (!CU_Nodes)
     return;
+  TypeIdentifierMap = generateDITypeIdentifierMap(CU_Nodes);
 
   // Emit initial sections so we can reference labels later.
   emitSectionLabels();
@@ -2120,7 +2121,7 @@ void DwarfDebug::emitEndOfLineMatrix(unsigned SectionEnd) {
 
 // Emit visible names into a hashed accelerator table section.
 void DwarfDebug::emitAccelNames() {
-  DwarfAccelTable AT(DwarfAccelTable::Atom(DwarfAccelTable::eAtomTypeDIEOffset,
+  DwarfAccelTable AT(DwarfAccelTable::Atom(dwarf::DW_ATOM_die_offset,
                                            dwarf::DW_FORM_data4));
   for (DenseMap<const MDNode *, CompileUnit *>::iterator I = CUMap.begin(),
          E = CUMap.end(); I != E; ++I) {
@@ -2149,7 +2150,7 @@ void DwarfDebug::emitAccelNames() {
 // Emit objective C classes and categories into a hashed accelerator table
 // section.
 void DwarfDebug::emitAccelObjC() {
-  DwarfAccelTable AT(DwarfAccelTable::Atom(DwarfAccelTable::eAtomTypeDIEOffset,
+  DwarfAccelTable AT(DwarfAccelTable::Atom(dwarf::DW_ATOM_die_offset,
                                            dwarf::DW_FORM_data4));
   for (DenseMap<const MDNode *, CompileUnit *>::iterator I = CUMap.begin(),
          E = CUMap.end(); I != E; ++I) {
@@ -2177,7 +2178,7 @@ void DwarfDebug::emitAccelObjC() {
 
 // Emit namespace dies into a hashed accelerator table.
 void DwarfDebug::emitAccelNamespaces() {
-  DwarfAccelTable AT(DwarfAccelTable::Atom(DwarfAccelTable::eAtomTypeDIEOffset,
+  DwarfAccelTable AT(DwarfAccelTable::Atom(dwarf::DW_ATOM_die_offset,
                                            dwarf::DW_FORM_data4));
   for (DenseMap<const MDNode *, CompileUnit *>::iterator I = CUMap.begin(),
          E = CUMap.end(); I != E; ++I) {
@@ -2206,11 +2207,11 @@ void DwarfDebug::emitAccelNamespaces() {
 // Emit type dies into a hashed accelerator table.
 void DwarfDebug::emitAccelTypes() {
   std::vector<DwarfAccelTable::Atom> Atoms;
-  Atoms.push_back(DwarfAccelTable::Atom(DwarfAccelTable::eAtomTypeDIEOffset,
+  Atoms.push_back(DwarfAccelTable::Atom(dwarf::DW_ATOM_die_offset,
                                         dwarf::DW_FORM_data4));
-  Atoms.push_back(DwarfAccelTable::Atom(DwarfAccelTable::eAtomTypeTag,
+  Atoms.push_back(DwarfAccelTable::Atom(dwarf::DW_ATOM_die_tag,
                                         dwarf::DW_FORM_data2));
-  Atoms.push_back(DwarfAccelTable::Atom(DwarfAccelTable::eAtomTypeTypeFlags,
+  Atoms.push_back(DwarfAccelTable::Atom(dwarf::DW_ATOM_type_flags,
                                         dwarf::DW_FORM_data1));
   DwarfAccelTable AT(Atoms);
   for (DenseMap<const MDNode *, CompileUnit *>::iterator I = CUMap.begin(),
@@ -2630,4 +2631,9 @@ void DwarfDebug::emitDebugStrDWO() {
   const MCSymbol *StrSym = DwarfStrSectionSym;
   InfoHolder.emitStrings(Asm->getObjFileLowering().getDwarfStrDWOSection(),
                          OffSec, StrSym);
+}
+
+/// Find the MDNode for the given type reference.
+MDNode *DwarfDebug::resolve(DITypeRef TRef) const {
+  return TRef.resolve(TypeIdentifierMap);
 }

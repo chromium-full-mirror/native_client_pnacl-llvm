@@ -80,7 +80,6 @@ namespace {
     bool OptimizeGlobalCtorsList(GlobalVariable *&GCL);
     bool ProcessGlobal(GlobalVariable *GV,Module::global_iterator &GVI);
     bool ProcessInternalGlobal(GlobalVariable *GV,Module::global_iterator &GVI,
-                               const SmallPtrSet<const PHINode*, 16> &PHIUsers,
                                const GlobalStatus &GS);
     bool OptimizeEmptyGlobalCXXDtors(Function *CXAAtExitFn);
 
@@ -1934,7 +1933,7 @@ bool GlobalOpt::ProcessGlobal(GlobalVariable *GV,
   if (GV->isConstant() || !GV->hasInitializer())
     return false;
 
-  return ProcessInternalGlobal(GV, GVI, PHIUsers, GS);
+  return ProcessInternalGlobal(GV, GVI, GS);
 }
 
 bool GlobalOpt::IsUserEntryPointMain(const Function *Func) {    // @LOCALMOD
@@ -1952,7 +1951,6 @@ bool GlobalOpt::IsUserEntryPointMain(const Function *Func) {    // @LOCALMOD
 /// it if possible.  If we make a change, return true.
 bool GlobalOpt::ProcessInternalGlobal(GlobalVariable *GV,
                                       Module::global_iterator &GVI,
-                                const SmallPtrSet<const PHINode*, 16> &PHIUsers,
                                       const GlobalStatus &GS) {
   // If this is a first class global and has only one accessing function
   // and this function is main (which we know is not recursive), we replace
