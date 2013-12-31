@@ -22,8 +22,6 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/Mangler.h"
 #include "llvm/Target/TargetFrameLowering.h"
 #include "llvm/Target/TargetMachine.h"
@@ -747,7 +745,7 @@ void CompileUnit::addTemplateParams(DIE &Buffer, DIArray TParams) {
 }
 
 /// getOrCreateContextDIE - Get context owner's DIE.
-DIE *CompileUnit::getOrCreateContextDIE(DIDescriptor Context) {
+DIE *CompileUnit::getOrCreateContextDIE(DIScope Context) {
   if (Context.isType())
     return getOrCreateTypeDIE(DIType(Context));
   else if (Context.isNameSpace())
@@ -759,7 +757,7 @@ DIE *CompileUnit::getOrCreateContextDIE(DIDescriptor Context) {
 }
 
 /// addToContextOwner - Add Die into the list of its context owner's children.
-void CompileUnit::addToContextOwner(DIE *Die, DIDescriptor Context) {
+void CompileUnit::addToContextOwner(DIE *Die, DIScope Context) {
   assert(!Die->getParent());
   if (DIE *ContextDIE = getOrCreateContextDIE(Context)) {
     if (Die->getParent()) {
@@ -784,7 +782,7 @@ DIE *CompileUnit::getOrCreateTypeDIE(const MDNode *TyNode) {
     return TyDIE;
 
   // Create new type.
-  TyDIE = new DIE(dwarf::DW_TAG_base_type);
+  TyDIE = new DIE(Ty.getTag());
   insertDIE(Ty, TyDIE);
   if (Ty.isBasicType())
     constructTypeDIE(*TyDIE, DIBasicType(Ty));
@@ -874,7 +872,7 @@ void CompileUnit::addGlobalName(StringRef Name, DIE *Die) {
 /// addGlobalType - Add a new global type to the compile unit.
 ///
 void CompileUnit::addGlobalType(DIType Ty) {
-  DIDescriptor Context = DD->resolve(Ty.getContext());
+  DIScope Context = DD->resolve(Ty.getContext());
   if (!Ty.getName().empty() && !Ty.isForwardDecl() &&
       (!Context || Context.isCompileUnit() || Context.isFile() ||
        Context.isNameSpace()))
@@ -882,7 +880,7 @@ void CompileUnit::addGlobalType(DIType Ty) {
       GlobalTypes[Ty.getName()] = Entry->getEntry();
 }
 
-/// addPubTypes - Add type for pubtypes section.
+/// addPubTypes - Add subprogram argument types for pubtypes section.
 void CompileUnit::addPubTypes(DISubprogram SP) {
   DICompositeType SPTy = SP.getType();
   uint16_t SPTag = SPTy.getTag();
@@ -906,13 +904,10 @@ void CompileUnit::constructTypeDIE(DIE &Buffer, DIBasicType BTy) {
   if (!Name.empty())
     addString(&Buffer, dwarf::DW_AT_name, Name);
 
-  if (BTy.getTag() == dwarf::DW_TAG_unspecified_type) {
-    Buffer.setTag(dwarf::DW_TAG_unspecified_type);
-    // An unspecified type only has a name attribute.
+  // An unspecified type only has a name attribute.
+  if (BTy.getTag() == dwarf::DW_TAG_unspecified_type)
     return;
-  }
 
-  Buffer.setTag(dwarf::DW_TAG_base_type);
   addUInt(&Buffer, dwarf::DW_AT_encoding, dwarf::DW_FORM_data1,
           BTy.getEncoding());
 
@@ -925,12 +920,7 @@ void CompileUnit::constructTypeDIE(DIE &Buffer, DIDerivedType DTy) {
   // Get core information.
   StringRef Name = DTy.getName();
   uint64_t Size = DTy.getSizeInBits() >> 3;
-  uint16_t Tag = DTy.getTag();
-
-  // FIXME - Workaround for templates.
-  if (Tag == dwarf::DW_TAG_inheritance) Tag = dwarf::DW_TAG_reference_type;
-
-  Buffer.setTag(Tag);
+  uint16_t Tag = Buffer.getTag();
 
   // Map to main type, void will not have a type.
   DIType FromTy = DTy.getTypeDerivedFrom();
@@ -976,13 +966,11 @@ static bool shouldCreateTypeUnit(DICompositeType CTy, const DwarfDebug *DD) {
   case dwarf::DW_TAG_enumeration_type:
   case dwarf::DW_TAG_class_type:
     // If this is a class, structure, union, or enumeration type
-    // that is not a declaration, is a type definition, and not scoped
+    // that is a definition (not a declaration), and not scoped
     // inside a function then separate this out as a type unit.
-    if (CTy.isForwardDecl() || !isTypeUnitScoped(CTy, DD))
-      return 0;
-    return 1;
+    return !CTy.isForwardDecl() && isTypeUnitScoped(CTy, DD);
   default:
-    return 0;
+    return false;
   }
 }
 
@@ -992,8 +980,7 @@ void CompileUnit::constructTypeDIE(DIE &Buffer, DICompositeType CTy) {
   StringRef Name = CTy.getName();
 
   uint64_t Size = CTy.getSizeInBits() >> 3;
-  uint16_t Tag = CTy.getTag();
-  Buffer.setTag(Tag);
+  uint16_t Tag = Buffer.getTag();
 
   switch (Tag) {
   case dwarf::DW_TAG_array_type:
@@ -1409,7 +1396,7 @@ void CompileUnit::createGlobalVariableDIE(const MDNode *N) {
   if (!GV.isGlobalVariable())
     return;
 
-  DIDescriptor GVContext = GV.getContext();
+  DIScope GVContext = GV.getContext();
   DIType GTy = GV.getType();
 
   // If this is a static data member definition, some attributes belong
@@ -1568,7 +1555,6 @@ void CompileUnit::constructSubrangeDIE(DIE &Buffer, DISubrange SR,
 /// constructArrayTypeDIE - Construct array type DIE from DICompositeType.
 void CompileUnit::constructArrayTypeDIE(DIE &Buffer,
                                         DICompositeType *CTy) {
-  Buffer.setTag(dwarf::DW_TAG_array_type);
   if (CTy->isVector())
     addFlag(&Buffer, dwarf::DW_AT_GNU_vector);
 
@@ -1628,11 +1614,8 @@ DIE *CompileUnit::constructVariableDIE(DbgVariable *DV,
                                        bool isScopeAbstract) {
   StringRef Name = DV->getName();
 
-  // Translate tag to proper Dwarf tag.
-  uint16_t Tag = DV->getTag();
-
   // Define variable debug information entry.
-  DIE *VariableDie = new DIE(Tag);
+  DIE *VariableDie = new DIE(DV->getTag());
   DbgVariable *AbsVar = DV->getAbstractVariable();
   DIE *AbsDIE = AbsVar ? AbsVar->getDIE() : NULL;
   if (AbsDIE)
