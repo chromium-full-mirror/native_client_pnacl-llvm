@@ -3259,9 +3259,7 @@ bool GlobalOpt::OptimizeGlobalAliases(Module &M) {
 
       if (Used.compilerUsedErase(J))
         Used.compilerUsedInsert(Target);
-    }
-
-    if (mayHaveOtherReferences(*J, Used))
+    } else if (mayHaveOtherReferences(*J, Used))
       continue;
 
     // Delete the alias.
