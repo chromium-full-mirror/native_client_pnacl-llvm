@@ -13,17 +13,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "SIISelLowering.h"
-#include "AMDIL.h"
 #include "AMDGPU.h"
+#include "AMDIL.h"
 #include "AMDILIntrinsicInfo.h"
 #include "SIInstrInfo.h"
 #include "SIMachineFunctionInfo.h"
 #include "SIRegisterInfo.h"
-#include "llvm/IR/Function.h"
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/IR/Function.h"
 
 using namespace llvm;
 
@@ -706,7 +706,7 @@ SDNode *SITargetLowering::foldOperands(MachineSDNode *Node,
 }
 
 /// \brief Helper function for adjustWritemask
-unsigned SubIdx2Lane(unsigned Idx) {
+static unsigned SubIdx2Lane(unsigned Idx) {
   switch (Idx) {
   default: return 0;
   case AMDGPU::sub0: return 0;

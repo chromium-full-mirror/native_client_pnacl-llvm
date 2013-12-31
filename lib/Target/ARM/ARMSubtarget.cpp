@@ -117,6 +117,7 @@ void ARMSubtarget::initializeEnvironment() {
   HasRAS = false;
   HasMPExtension = false;
   FPOnlySP = false;
+  HasPerfMon = false;
   HasTrustZone = false;
   AllowsUnalignedMem = false;
   Thumb2DSP = false;
