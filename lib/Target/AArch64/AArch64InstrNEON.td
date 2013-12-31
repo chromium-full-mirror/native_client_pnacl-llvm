@@ -3092,6 +3092,39 @@ multiclass Neon_Scalar3Same_SD_size_patterns<SDPatternOperator opnode,
             (INSTD FPR64:$Rn, FPR64:$Rm)>;
 }
 
+// Scalar Two Registers Miscellaneous
+ 
+multiclass NeonI_Scalar2SameMisc_SD_size<bit u, bit size_high, bits<5> opcode,
+                                         string asmop> {
+  def ss : NeonI_Scalar2SameMisc<u, {size_high, 0b0}, opcode,
+                          (outs FPR32:$Rd), (ins FPR32:$Rn),
+                          !strconcat(asmop, " $Rd, $Rn"),
+                          [], NoItinerary>;
+  def dd : NeonI_Scalar2SameMisc<u, {size_high, 0b1}, opcode,
+                          (outs FPR64:$Rd), (ins FPR64:$Rn),
+                          !strconcat(asmop, " $Rd, $Rn"),
+                          [], NoItinerary>;
+}
+
+multiclass Neon_Scalar2SameMisc_cvt_SD_size_patterns<SDPatternOperator Sopnode,
+                                                     SDPatternOperator Dopnode,
+                                                     Instruction INSTS,
+                                                     Instruction INSTD> {
+  def : Pat<(v1f32 (Sopnode (v1i32 FPR32:$Rn))),
+            (INSTS FPR32:$Rn)>;
+  def : Pat<(v1f64 (Dopnode (v1i64 FPR64:$Rn))),
+            (INSTD FPR64:$Rn)>;
+}
+
+multiclass Neon_Scalar2SameMisc_SD_size_patterns<SDPatternOperator opnode,
+                                                 Instruction INSTS,
+                                                 Instruction INSTD> {
+  def : Pat<(v1f32 (opnode (v1f32 FPR32:$Rn))),
+            (INSTS FPR32:$Rn)>;
+  def : Pat<(v1f64 (opnode (v1f64 FPR64:$Rn))),
+            (INSTD FPR64:$Rn)>;
+}
+
 // Scalar Integer Add
 let isCommutable = 1 in {
 def ADDddd : NeonI_Scalar3Same_D_size<0b0, 0b10000, "add">;
@@ -3231,6 +3264,33 @@ defm : Neon_Scalar3Same_BHSD_size_patterns<int_aarch64_neon_vqrshlu, UQRSHLbbb,
 // Scalar Integer Saturating Rounding Shift Left (Signed, Unsigned)
 defm : Neon_Scalar3Same_D_size_patterns<int_arm_neon_vqrshifts, SQRSHLddd>;
 defm : Neon_Scalar3Same_D_size_patterns<int_arm_neon_vqrshiftu, UQRSHLddd>;
+
+// Scalar Signed Integer Convert To Floating-point
+defm SCVTF  : NeonI_Scalar2SameMisc_SD_size<0b0, 0b0, 0b11101, "scvtf">;
+defm : Neon_Scalar2SameMisc_cvt_SD_size_patterns<int_aarch64_neon_vcvtf32_s32,
+                                                 int_aarch64_neon_vcvtf64_s64,
+                                                 SCVTFss, SCVTFdd>;
+
+// Scalar Unsigned Integer Convert To Floating-point
+defm UCVTF  : NeonI_Scalar2SameMisc_SD_size<0b1, 0b0, 0b11101, "ucvtf">;
+defm : Neon_Scalar2SameMisc_cvt_SD_size_patterns<int_aarch64_neon_vcvtf32_u32,
+                                                 int_aarch64_neon_vcvtf64_u64,
+                                                 UCVTFss, UCVTFdd>;
+
+// Scalar Floating-point Reciprocal Estimate
+defm FRECPE : NeonI_Scalar2SameMisc_SD_size<0b0, 0b1, 0b11101, "frecpe">;
+defm : Neon_Scalar2SameMisc_SD_size_patterns<int_arm_neon_vrecpe,
+                                             FRECPEss, FRECPEdd>;
+
+// Scalar Floating-point Reciprocal Exponent
+defm FRECPX : NeonI_Scalar2SameMisc_SD_size<0b0, 0b1, 0b11111, "frecpx">;
+defm : Neon_Scalar2SameMisc_SD_size_patterns<int_aarch64_neon_vrecpx,
+                                             FRECPXss, FRECPXdd>;
+
+// Scalar Floating-point Reciprocal Square Root Estimate
+defm FRSQRTE: NeonI_Scalar2SameMisc_SD_size<0b1, 0b1, 0b11101, "frsqrte">;
+defm : Neon_Scalar2SameMisc_SD_size_patterns<int_arm_neon_vrsqrte,
+                                             FRSQRTEss, FRSQRTEdd>;
 
 // Scalar Reduce Pairwise
 
