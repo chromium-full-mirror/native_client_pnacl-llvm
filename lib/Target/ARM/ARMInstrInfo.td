@@ -1991,14 +1991,14 @@ let isReturn = 1, isTerminator = 1, isBarrier = 1 in {
   // ARMV4T and above
   def BX_RET : AI<(outs), (ins), BrMiscFrm, IIC_Br,
                   "bx", "\tlr", [(ARMretflag)]>,
-               Requires<[IsARM, HasV4T]> {
+               Requires<[IsARM, HasV4T]>, Sched<[WriteBr]> {
     let Inst{27-0}  = 0b0001001011111111111100011110;
   }
 
   // ARMV4 only
   def MOVPCLR : AI<(outs), (ins), BrMiscFrm, IIC_Br,
                   "mov", "\tpc, lr", [(ARMretflag)]>,
-               Requires<[IsARM, NoV4T]> {
+               Requires<[IsARM, NoV4T]>, Sched<[WriteBr]> {
     let Inst{27-0} = 0b0001101000001111000000001110;
   }
 }
@@ -2008,7 +2008,7 @@ let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in {
   // ARMV4T and above
   def BX : AXI<(outs), (ins GPR:$dst), BrMiscFrm, IIC_Br, "bx\t$dst",
                   [(brind GPR:$dst)]>,
-              Requires<[IsARM, HasV4T]> {
+              Requires<[IsARM, HasV4T]>, Sched<[WriteBr]> {
     bits<4> dst;
     let Inst{31-4} = 0b1110000100101111111111110001;
     let Inst{3-0}  = dst;
@@ -2016,7 +2016,7 @@ let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in {
 
   def BX_pred : AI<(outs), (ins GPR:$dst), BrMiscFrm, IIC_Br,
                   "bx", "\t$dst", [/* pattern left blank */]>,
-              Requires<[IsARM, HasV4T]> {
+              Requires<[IsARM, HasV4T]>, Sched<[WriteBr]> {
     bits<4> dst;
     let Inst{27-4} = 0b000100101111111111110001;
     let Inst{3-0}  = dst;
@@ -2060,7 +2060,7 @@ let isCall = 1,
   def BL  : ABXI<0b1011, (outs), (ins bl_target:$func),
                 IIC_Br, "bl\t$func",
                 [(ARMcall tglobaladdr:$func)]>,
-            Requires<[IsARM]> {
+            Requires<[IsARM]>, Sched<[WriteBrL]> {
     let Inst{31-28} = 0b1110;
     bits<24> func;
     let Inst{23-0} = func;
@@ -2070,7 +2070,7 @@ let isCall = 1,
   def BL_pred : ABI<0b1011, (outs), (ins bl_target:$func),
                    IIC_Br, "bl", "\t$func",
                    [(ARMcall_pred tglobaladdr:$func)]>,
-                Requires<[IsARM]> {
+                Requires<[IsARM]>, Sched<[WriteBrL]> {
     bits<24> func;
     let Inst{23-0} = func;
     let DecoderMethod = "DecodeBranchImmInstruction";
@@ -2080,7 +2080,7 @@ let isCall = 1,
   def BLX : AXI<(outs), (ins GPR:$func), BrMiscFrm,
                 IIC_Br, "blx\t$func",
                 [(ARMcall GPR:$func)]>,
-            Requires<[IsARM, HasV5T]> {
+            Requires<[IsARM, HasV5T]>, Sched<[WriteBrL]> {
     bits<4> func;
     let Inst{31-4} = 0b1110000100101111111111110011;
     let Inst{3-0}  = func;
@@ -2089,7 +2089,7 @@ let isCall = 1,
   def BLX_pred : AI<(outs), (ins GPR:$func), BrMiscFrm,
                     IIC_Br, "blx", "\t$func",
                     [(ARMcall_pred GPR:$func)]>,
-                 Requires<[IsARM, HasV5T]> {
+                 Requires<[IsARM, HasV5T]>, Sched<[WriteBrL]> {
     bits<4> func;
     let Inst{27-4} = 0b000100101111111111110011;
     let Inst{3-0}  = func;
@@ -2099,18 +2099,18 @@ let isCall = 1,
   // Note: Restrict $func to the tGPR regclass to prevent it being in LR.
   def BX_CALL : ARMPseudoInst<(outs), (ins tGPR:$func),
                    8, IIC_Br, [(ARMcall_nolink tGPR:$func)]>,
-                   Requires<[IsARM, HasV4T]>;
+                   Requires<[IsARM, HasV4T]>, Sched<[WriteBr]>;
 
   // ARMv4
   def BMOVPCRX_CALL : ARMPseudoInst<(outs), (ins tGPR:$func),
                    8, IIC_Br, [(ARMcall_nolink tGPR:$func)]>,
-                   Requires<[IsARM, NoV4T]>;
+                   Requires<[IsARM, NoV4T]>, Sched<[WriteBr]>;
 
   // mov lr, pc; b if callee is marked noreturn to avoid confusing the
   // return stack predictor.
   def BMOVPCB_CALL : ARMPseudoInst<(outs), (ins bl_target:$func),
                                8, IIC_Br, [(ARMcall_nolink tglobaladdr:$func)]>,
-                      Requires<[IsARM]>;
+                      Requires<[IsARM]>, Sched<[WriteBr]>;
 }
 
 let isBranch = 1, isTerminator = 1 in {
@@ -2118,7 +2118,8 @@ let isBranch = 1, isTerminator = 1 in {
   // a two-value operand where a dag node expects two operands. :(
   def Bcc : ABI<0b1010, (outs), (ins br_target:$target),
                IIC_Br, "b", "\t$target",
-               [/*(ARMbrcond bb:$target, imm:$cc, CCR:$ccr)*/]> {
+               [/*(ARMbrcond bb:$target, imm:$cc, CCR:$ccr)*/]>,
+               Sched<[WriteBr]>  {
     bits<24> target;
     let Inst{23-0} = target;
     let DecoderMethod = "DecodeBranchImmInstruction";
@@ -2131,25 +2132,27 @@ let isBranch = 1, isTerminator = 1 in {
     // should be sufficient.
     // FIXME: Is B really a Barrier? That doesn't seem right.
     def B : ARMPseudoExpand<(outs), (ins br_target:$target), 4, IIC_Br,
-                [(br bb:$target)], (Bcc br_target:$target, (ops 14, zero_reg))>;
+                [(br bb:$target)], (Bcc br_target:$target, (ops 14, zero_reg))>,
+                Sched<[WriteBr]>;
 
     let isNotDuplicable = 1, isIndirectBranch = 1 in {
     def BR_JTr : ARMPseudoInst<(outs),
                       (ins GPR:$target, i32imm:$jt, i32imm:$id),
                       0, IIC_Br,
-                      [(ARMbrjt GPR:$target, tjumptable:$jt, imm:$id)]>;
+                      [(ARMbrjt GPR:$target, tjumptable:$jt, imm:$id)]>,
+                      Sched<[WriteBr]>;
     // FIXME: This shouldn't use the generic "addrmode2," but rather be split
     // into i12 and rs suffixed versions.
     def BR_JTm : ARMPseudoInst<(outs),
                      (ins addrmode2:$target, i32imm:$jt, i32imm:$id),
                      0, IIC_Br,
                      [(ARMbrjt (i32 (load addrmode2:$target)), tjumptable:$jt,
-                       imm:$id)]>;
+                       imm:$id)]>, Sched<[WriteBrTbl]>;
     def BR_JTadd : ARMPseudoInst<(outs),
                    (ins GPR:$target, GPR:$idx, i32imm:$jt, i32imm:$id),
                    0, IIC_Br,
                    [(ARMbrjt (add GPR:$target, GPR:$idx), tjumptable:$jt,
-                     imm:$id)]>;
+                     imm:$id)]>, Sched<[WriteBrTbl]>;
     } // isNotDuplicable = 1, isIndirectBranch = 1
   } // isBarrier = 1
 
@@ -2158,7 +2161,7 @@ let isBranch = 1, isTerminator = 1 in {
 // BLX (immediate)
 def BLXi : AXI<(outs), (ins blx_target:$target), BrMiscFrm, NoItinerary,
                "blx\t$target", []>,
-           Requires<[IsARM, HasV5T]> {
+           Requires<[IsARM, HasV5T]>, Sched<[WriteBrL]> {
   let Inst{31-25} = 0b1111101;
   bits<25> target;
   let Inst{23-0} = target{24-1};
@@ -2167,7 +2170,7 @@ def BLXi : AXI<(outs), (ins blx_target:$target), BrMiscFrm, NoItinerary,
 
 // Branch and Exchange Jazelle
 def BXJ : ABI<0b0001, (outs), (ins GPR:$func), NoItinerary, "bxj", "\t$func",
-              [/* pattern left blank */]> {
+              [/* pattern left blank */]>, Sched<[WriteBr]> {
   bits<4> func;
   let Inst{23-20} = 0b0010;
   let Inst{19-8} = 0xfff;
@@ -2178,18 +2181,20 @@ def BXJ : ABI<0b0001, (outs), (ins GPR:$func), NoItinerary, "bxj", "\t$func",
 // Tail calls.
 
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [SP] in {
-  def TCRETURNdi : PseudoInst<(outs), (ins i32imm:$dst), IIC_Br, []>;
+  def TCRETURNdi : PseudoInst<(outs), (ins i32imm:$dst), IIC_Br, []>,
+                   Sched<[WriteBr]>;
 
-  def TCRETURNri : PseudoInst<(outs), (ins tcGPR:$dst), IIC_Br, []>;
+  def TCRETURNri : PseudoInst<(outs), (ins tcGPR:$dst), IIC_Br, []>,
+                   Sched<[WriteBr]>;
 
   def TAILJMPd : ARMPseudoExpand<(outs), (ins br_target:$dst),
                                  4, IIC_Br, [],
                                  (Bcc br_target:$dst, (ops 14, zero_reg))>,
-                                 Requires<[IsARM]>;
+                                 Requires<[IsARM]>, Sched<[WriteBr]>;
 
   def TAILJMPr : ARMPseudoExpand<(outs), (ins tcGPR:$dst),
                                  4, IIC_Br, [],
-                                 (BX GPR:$dst)>,
+                                 (BX GPR:$dst)>, Sched<[WriteBr]>,
                                  Requires<[IsARM]>;
 }
 
@@ -2203,7 +2208,8 @@ def SMC : ABI<0b0001, (outs), (ins imm0_15:$opt), NoItinerary, "smc", "\t$opt",
 
 // Supervisor Call (Software Interrupt)
 let isCall = 1, Uses = [SP] in {
-def SVC : ABI<0b1111, (outs), (ins imm24b:$svc), IIC_Br, "svc", "\t$svc", []> {
+def SVC : ABI<0b1111, (outs), (ins imm24b:$svc), IIC_Br, "svc", "\t$svc", []>,
+          Sched<[WriteBr]> {
   bits<24> svc;
   let Inst{23-0} = svc;
 }
@@ -4265,11 +4271,13 @@ let usesCustomInserter = 1, isBranch = 1, isTerminator = 1,
 def BCCi64 : PseudoInst<(outs),
     (ins i32imm:$cc, GPR:$lhs1, GPR:$lhs2, GPR:$rhs1, GPR:$rhs2, brtarget:$dst),
      IIC_Br,
-    [(ARMBcci64 imm:$cc, GPR:$lhs1, GPR:$lhs2, GPR:$rhs1, GPR:$rhs2, bb:$dst)]>;
+    [(ARMBcci64 imm:$cc, GPR:$lhs1, GPR:$lhs2, GPR:$rhs1, GPR:$rhs2, bb:$dst)]>,
+    Sched<[WriteBr]>;
 
 def BCCZi64 : PseudoInst<(outs),
      (ins i32imm:$cc, GPR:$lhs1, GPR:$lhs2, brtarget:$dst), IIC_Br,
-    [(ARMBcci64 imm:$cc, GPR:$lhs1, GPR:$lhs2, 0, 0, bb:$dst)]>;
+    [(ARMBcci64 imm:$cc, GPR:$lhs1, GPR:$lhs2, 0, 0, bb:$dst)]>,
+    Sched<[WriteBr]>;
 } // usesCustomInserter
 
 
@@ -4974,7 +4982,7 @@ def MSRi : ABI<0b0011, (outs), (ins msr_mask:$mask,  so_imm:$a), NoItinerary,
 let isCall = 1,
   Defs = [R0, R12, LR, CPSR], Uses = [SP] in {
   def TPsoft : PseudoInst<(outs), (ins), IIC_Br,
-               [(set R0, ARMthread_pointer)]>;
+               [(set R0, ARMthread_pointer)]>, Sched<[WriteBr]>;
 }
 
 //===----------------------------------------------------------------------===//
@@ -5038,7 +5046,7 @@ let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in
   def MOVPCRX : ARMPseudoExpand<(outs), (ins GPR:$dst),
                     4, IIC_Br, [(brind GPR:$dst)],
                     (MOVr PC, GPR:$dst, (ops 14, zero_reg), zero_reg)>,
-                  Requires<[IsARM, NoV4T]>;
+                  Requires<[IsARM, NoV4T]>, Sched<[WriteBr]>;
 
 // Large immediate handling.
 
