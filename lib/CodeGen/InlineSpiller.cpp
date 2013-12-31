@@ -578,7 +578,7 @@ MachineInstr *InlineSpiller::traceSiblingValue(unsigned UseReg, VNInfo *UseVNI,
     if (unsigned SrcReg = isFullCopyOf(MI, Reg)) {
       if (isSibling(SrcReg)) {
         LiveInterval &SrcLI = LIS.getInterval(SrcReg);
-        LiveRangeQuery SrcQ(SrcLI, VNI->def);
+        LiveQueryResult SrcQ = SrcLI.Query(VNI->def);
         assert(SrcQ.valueIn() && "Copy from non-existing value");
         // Check if this COPY kills its source.
         SVI->second.KillsSource = SrcQ.isKill();
@@ -1106,10 +1106,10 @@ foldMemoryOperand(ArrayRef<std::pair<MachineInstr*, unsigned> > Ops,
     // FoldMI does not define this physreg. Remove the LI segment.
     assert(MO->isDead() && "Cannot fold physreg def");
     for (MCRegUnitIterator Units(Reg, &TRI); Units.isValid(); ++Units) {
-      if (LiveInterval *LI = LIS.getCachedRegUnit(*Units)) {
+      if (LiveRange *LR = LIS.getCachedRegUnit(*Units)) {
         SlotIndex Idx = LIS.getInstructionIndex(MI).getRegSlot();
-        if (VNInfo *VNI = LI->getVNInfoAt(Idx))
-          LI->removeValNo(VNI);
+        if (VNInfo *VNI = LR->getVNInfoAt(Idx))
+          LR->removeValNo(VNI);
       }
     }
   }
@@ -1337,7 +1337,7 @@ void InlineSpiller::spill(LiveRangeEdit &edit) {
 
   DEBUG(dbgs() << "Inline spilling "
                << MRI.getRegClass(edit.getReg())->getName()
-               << ':' << PrintReg(edit.getReg()) << ' ' << edit.getParent()
+               << ':' << edit.getParent()
                << "\nFrom original " << PrintReg(Original) << '\n');
   assert(edit.getParent().isSpillable() &&
          "Attempting to spill already spilled value.");
