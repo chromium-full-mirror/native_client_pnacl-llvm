@@ -127,8 +127,9 @@ public:
   static const int MAX_COST = INT_MIN;
 
   FuncSLP(Function *Func, ScalarEvolution *Se, DataLayout *Dl,
-          TargetTransformInfo *Tti, AliasAnalysis *Aa, LoopInfo *Li) :
-    F(Func), SE(Se), DL(Dl), TTI(Tti), AA(Aa), LI(Li),
+          TargetTransformInfo *Tti, AliasAnalysis *Aa, LoopInfo *Li, 
+          DominatorTree *Dt) :
+    F(Func), SE(Se), DL(Dl), TTI(Tti), AA(Aa), LI(Li), DT(Dt),
     Builder(Se->getContext()) {
     for (Function::iterator it = F->begin(), e = F->end(); it != e; ++it) {
       BasicBlock *BB = it;
@@ -255,6 +256,7 @@ public:
   TargetTransformInfo *TTI;
   AliasAnalysis *AA;
   LoopInfo *LI;
+  DominatorTree *DT;
   /// Instruction builder to construct the vectorized tree.
   IRBuilder<> Builder;
 };
@@ -848,6 +850,12 @@ bool FuncSLP::vectorizeStoreChain(ArrayRef<Value *> Chain, int CostThreshold) {
     if (Cost < CostThreshold) {
       DEBUG(dbgs() << "SLP: Decided to vectorize cost=" << Cost << "\n");
       vectorizeTree(Operands);
+
+      // Remove the scalar stores.
+      for (int i = 0, e = VF; i < e; ++i)
+        cast<Instruction>(Operands[i])->eraseFromParent();
+
+      // Move to the next bundle.
       i += VF - 1;
       Changed = true;
     }
@@ -865,6 +873,11 @@ bool FuncSLP::vectorizeStoreChain(ArrayRef<Value *> Chain, int CostThreshold) {
     DEBUG(dbgs() << "SLP: Found store chain cost = " << Cost
                  << " for size = " << ChainLen << "\n");
     vectorizeTree(Chain);
+
+    // Remove all of the scalar stores.
+    for (int i = 0, e = Chain.size(); i < e; ++i)
+      cast<Instruction>(Chain[i])->eraseFromParent();
+
     return true;
   }
 
@@ -1100,9 +1113,6 @@ Value *FuncSLP::vectorizeTree_rec(ArrayRef<Value *> VL) {
     Value *VecPtr =
         Builder.CreateBitCast(SI->getPointerOperand(), VecTy->getPointerTo());
     Builder.CreateStore(VecValue, VecPtr)->setAlignment(Alignment);
-
-    for (int i = 0, e = VL.size(); i < e; ++i)
-      cast<Instruction>(VL[i])->eraseFromParent();
     return 0;
   }
   default:
@@ -1189,7 +1199,8 @@ void FuncSLP::optimizeGatherSequence() {
      // visited instructions.
       for (SmallPtrSet<Instruction*, 16>::iterator v = Visited.begin(),
            ve = Visited.end(); v != ve; ++v) {
-        if (Insert->isIdenticalTo(*v)) {
+        if (Insert->isIdenticalTo(*v) &&
+          DT->dominates((*v)->getParent(), Insert->getParent())) {
           Insert->replaceAllUsesWith(*v);
           break;
         }
@@ -1216,6 +1227,7 @@ struct SLPVectorizer : public FunctionPass {
   TargetTransformInfo *TTI;
   AliasAnalysis *AA;
   LoopInfo *LI;
+  DominatorTree *DT;
 
   virtual bool runOnFunction(Function &F) {
     SE = &getAnalysis<ScalarEvolution>();
@@ -1223,6 +1235,7 @@ struct SLPVectorizer : public FunctionPass {
     TTI = &getAnalysis<TargetTransformInfo>();
     AA = &getAnalysis<AliasAnalysis>();
     LI = &getAnalysis<LoopInfo>();
+    DT = &getAnalysis<DominatorTree>();
 
     StoreRefs.clear();
     bool Changed = false;
@@ -1236,7 +1249,7 @@ struct SLPVectorizer : public FunctionPass {
 
     // Use the bollom up slp vectorizer to construct chains that start with
     // he store instructions.
-    FuncSLP R(&F, SE, DL, TTI, AA, LI);
+    FuncSLP R(&F, SE, DL, TTI, AA, LI, DT);
 
     for (Function::iterator it = F.begin(), e = F.end(); it != e; ++it) {
       BasicBlock *BB = it;
@@ -1266,6 +1279,7 @@ struct SLPVectorizer : public FunctionPass {
     AU.addRequired<AliasAnalysis>();
     AU.addRequired<TargetTransformInfo>();
     AU.addRequired<LoopInfo>();
+    AU.addRequired<DominatorTree>();
   }
 
 private:
