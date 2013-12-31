@@ -113,14 +113,6 @@ namespace sys {
       /// @brief Return the executable file suffix.
       static StringRef GetEXESuffix();
 
-      /// Return the suffix commonly used on file names that contain a shared
-      /// object, shared archive, or dynamic link library. Such files are
-      /// linked at runtime into a process and their code images are shared
-      /// between processes.
-      /// @returns The dynamic link library suffix for the current platform.
-      /// @brief Return the dynamic link library suffix.
-      static StringRef GetDLLSuffix();
-
       /// GetMainExecutable - Return the path to the main executable, given the
       /// value of argv[0] from program startup and the address of main itself.
       /// In extremis, this function may fail and return an empty path.
@@ -207,16 +199,6 @@ namespace sys {
       /// @returns true iff the path is empty.
       /// @brief Determines if the path name is empty (invalid).
       bool isEmpty() const { return path.empty(); }
-
-       /// This function returns the last component of the path name. The last
-      /// component is the file or directory name occurring after the last
-      /// directory separator. If no directory separator is present, the entire
-      /// path name is returned (i.e. same as toString).
-      /// @returns StringRef containing the last component of the path name.
-      /// @brief Returns the last component of the path name.
-      LLVM_ATTRIBUTE_DEPRECATED(
-        StringRef getLast() const,
-        LLVM_PATH_DEPRECATED_MSG(path::filename));
 
       /// This function strips off the path and suffix of the file or directory
       /// name and returns just the basename. For example /a/foo.bar would cause
