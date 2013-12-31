@@ -116,21 +116,6 @@ namespace sys {
       /// @brief Construct a path to the system library directory
       static void GetSystemLibraryPaths(std::vector<sys::Path>& Paths);
 
-      /// Construct a vector of sys::Path that contains the "standard" bitcode
-      /// library paths suitable for linking into an llvm program. This function
-      /// *must* return the value of LLVM_LIB_SEARCH_PATH as well as the value
-      /// of LLVM_LIBDIR. It also must provide the System library paths as
-      /// returned by GetSystemLibraryPaths.
-      /// @see GetSystemLibraryPaths
-      /// @brief Construct a list of directories in which bitcode could be
-      /// found.
-      static void GetBitcodeLibraryPaths(std::vector<sys::Path>& Paths);
-
-      /// Find the path to a library using its short name. Use the system
-      /// dependent library paths to locate the library.
-      /// @brief Find a library.
-      static Path FindLibrary(std::string& short_name);
-
       /// Construct a path to the current user's home directory. The
       /// implementation must use an operating system specific mechanism for
       /// determining the user's home directory. For example, the environment
@@ -700,32 +685,6 @@ namespace sys {
 
     /// @}
   };
-
-  /// This enumeration delineates the kinds of files that LLVM knows about.
-  enum LLVMFileType {
-    Unknown_FileType = 0,              ///< Unrecognized file
-    Bitcode_FileType,                  ///< Bitcode file
-    Archive_FileType,                  ///< ar style archive file
-    ELF_Relocatable_FileType,          ///< ELF Relocatable object file
-    ELF_Executable_FileType,           ///< ELF Executable image
-    ELF_SharedObject_FileType,         ///< ELF dynamically linked shared lib
-    ELF_Core_FileType,                 ///< ELF core image
-    Mach_O_Object_FileType,            ///< Mach-O Object file
-    Mach_O_Executable_FileType,        ///< Mach-O Executable
-    Mach_O_FixedVirtualMemorySharedLib_FileType, ///< Mach-O Shared Lib, FVM
-    Mach_O_Core_FileType,              ///< Mach-O Core File
-    Mach_O_PreloadExecutable_FileType, ///< Mach-O Preloaded Executable
-    Mach_O_DynamicallyLinkedSharedLib_FileType, ///< Mach-O dynlinked shared lib
-    Mach_O_DynamicLinker_FileType,     ///< The Mach-O dynamic linker
-    Mach_O_Bundle_FileType,            ///< Mach-O Bundle file
-    Mach_O_DynamicallyLinkedSharedLibStub_FileType, ///< Mach-O Shared lib stub
-    Mach_O_DSYMCompanion_FileType,     ///< Mach-O dSYM companion file
-    COFF_FileType                      ///< COFF object file or lib
-  };
-
-  /// This utility function allows any memory block to be examined in order
-  /// to determine its file type.
-  LLVMFileType identifyFileType(StringRef Magic);
 
   /// This function can be used to copy the file specified by Src to the
   /// file specified by Dest. If an error occurs, Dest is removed.
