@@ -179,7 +179,7 @@ MachineInstr *R600VectorRegMerger::RebuildVector(
     unsigned DstReg = MRI->createVirtualRegister(&AMDGPU::R600_Reg128RegClass);
     unsigned SubReg = (*It).first;
     unsigned Swizzle = (*It).second;
-    unsigned Chan;
+    unsigned Chan = 0xDEADBEEF;
     for (unsigned j = 0, je = RemapChan.size(); j < je; j++) {
       if (RemapChan[j].first == Swizzle) {
         Chan = RemapChan[j].second;
@@ -198,6 +198,7 @@ MachineInstr *R600VectorRegMerger::RebuildVector(
         UpdatedUndef.erase(RemoveIt);
     }
     DEBUG(dbgs() << "    ->"; Tmp->dump(););
+    (void)Tmp;
     SrcVec = DstReg;
   }
   Pos = BuildMI(MBB, Pos, DL, TII->get(AMDGPU::COPY), Reg)
@@ -360,4 +361,3 @@ bool R600VectorRegMerger::runOnMachineFunction(MachineFunction &Fn) {
 llvm::FunctionPass *llvm::createR600VectorRegMerger(TargetMachine &tm) {
   return new R600VectorRegMerger(tm);
 }
-
