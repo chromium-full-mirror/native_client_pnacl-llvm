@@ -425,7 +425,7 @@ bool MipsLongBranch::runOnMachineFunction(MachineFunction &F) {
   MF = &F;
   initMBBInfo();
 
-  SmallVector<MBBInfo, 16>::iterator I, E = MBBInfos.end();
+  SmallVectorImpl<MBBInfo>::iterator I, E = MBBInfos.end();
   bool EverMadeChange = false, MadeChange = true;
 
   while (MadeChange) {
