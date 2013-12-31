@@ -119,6 +119,7 @@ void ARMSubtarget::initializeEnvironment() {
   AvoidMOVsShifterOperand = false;
   HasRAS = false;
   HasMPExtension = false;
+  HasVirtualization = false;
   FPOnlySP = false;
   HasPerfMon = false;
   HasTrustZone = false;
