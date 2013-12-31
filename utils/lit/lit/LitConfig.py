@@ -27,7 +27,8 @@ class LitConfig:
 
     def __init__(self, progname, path, quiet,
                  useValgrind, valgrindLeakCheck, valgrindArgs,
-                 debug, isWindows, params, config_prefix = None):
+                 noExecute, debug, isWindows,
+                 params, config_prefix = None):
         # The name of the test runner.
         self.progname = progname
         # The items to add to the PATH environment variable.
@@ -36,6 +37,7 @@ class LitConfig:
         self.useValgrind = bool(useValgrind)
         self.valgrindLeakCheck = bool(valgrindLeakCheck)
         self.valgrindUserArgs = list(valgrindArgs)
+        self.noExecute = noExecute
         self.debug = debug
         self.isWindows = bool(isWindows)
         self.params = dict(params)
@@ -100,7 +102,7 @@ class LitConfig:
             dir = lit.Util.whichTools(tools, paths)
 
         # bash
-        self.bashPath = Util.which('bash', dir)
+        self.bashPath = lit.Util.which('bash', dir)
         if self.bashPath is None:
             self.note("Unable to find 'bash.exe'.")
             self.bashPath = ''
