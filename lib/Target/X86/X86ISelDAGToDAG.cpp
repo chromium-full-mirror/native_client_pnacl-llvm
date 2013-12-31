@@ -1785,7 +1785,7 @@ void X86DAGToDAGISel::LegalizeAddressingModeForNaCl(SDValue N,
 ///
 SDNode *X86DAGToDAGISel::getGlobalBaseReg() {
   unsigned GlobalBaseReg = getInstrInfo()->getGlobalBaseReg(MF);
-  return CurDAG->getRegister(GlobalBaseReg, TLI.getPointerTy()).getNode();
+  return CurDAG->getRegister(GlobalBaseReg, TLI->getPointerTy()).getNode();
 }
 
 SDNode *X86DAGToDAGISel::SelectAtomic64(SDNode *Node, unsigned Opc) {
