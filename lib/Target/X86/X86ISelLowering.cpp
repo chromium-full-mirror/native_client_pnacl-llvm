@@ -173,7 +173,6 @@ X86TargetLowering::X86TargetLowering(X86TargetMachine &TM)
   X86StackPtr = Subtarget->has64BitPointers() ? X86::RSP : X86::ESP;
   // @LOCALMOD-END
 
-  RegInfo = TM.getRegisterInfo();
   TD = getDataLayout();
 
   resetOperationActions();
@@ -212,6 +211,8 @@ void X86TargetLowering::resetOperationActions() {
     setSchedulingPreference(Sched::ILP);
   else
     setSchedulingPreference(Sched::RegPressure);
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(TM.getRegisterInfo());
   setStackPointerRegisterToSaveRestore(X86StackPtr); // @LOCALMOD
 
   // Bypass expensive divides on Atom when compiling with O2
@@ -2400,6 +2401,8 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   // Walk the register/memloc assignments, inserting copies/loads.  In the case
   // of tail call optimization arguments are handle later.
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
     CCValAssign &VA = ArgLocs[i];
     EVT RegVT = VA.getLocVT();
@@ -2779,6 +2782,8 @@ X86TargetLowering::GetAlignedArgumentStackSize(unsigned StackSize,
                                                SelectionDAG& DAG) const {
   MachineFunction &MF = DAG.getMachineFunction();
   const TargetMachine &TM = MF.getTarget();
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(TM.getRegisterInfo());
   const TargetFrameLowering &TFI = *TM.getFrameLowering();
   unsigned StackAlignment = TFI.getStackAlignment();
   uint64_t AlignMask = StackAlignment - 1;
@@ -2891,6 +2896,8 @@ X86TargetLowering::IsEligibleForTailCallOptimization(SDValue Callee,
 
   // Can't do sibcall if stack needs to be dynamically re-aligned. PEI needs to
   // emit a special epilogue.
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   if (RegInfo->needsStackRealignment(MF))
     return false;
 
@@ -3151,6 +3158,8 @@ static SDValue getTargetShuffleNode(unsigned Opc, SDLoc dl, EVT VT,
 
 SDValue X86TargetLowering::getReturnAddressFrameIndex(SelectionDAG &DAG) const {
   MachineFunction &MF = DAG.getMachineFunction();
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   X86MachineFunctionInfo *FuncInfo = MF.getInfo<X86MachineFunctionInfo>();
   int ReturnAddrIndex = FuncInfo->getRAIndex();
 
@@ -10248,6 +10257,8 @@ X86TargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
     Chain = DAG.getNode(X86ISD::WIN_ALLOCA, dl, NodeTys, Chain, Flag);
     Flag = Chain.getValue(1);
 
+    const X86RegisterInfo *RegInfo =
+      static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
     Chain = DAG.getCopyFromReg(Chain, dl, X86StackPtr, // @LOCALMOD
                                SPTy).getValue(1);
 
@@ -11227,8 +11238,9 @@ SDValue X86TargetLowering::LowerRETURNADDR(SDValue Op,
 
   if (Depth > 0) {
     SDValue FrameAddr = LowerFRAMEADDR(Op, DAG);
-    SDValue Offset =
-      DAG.getConstant(RegInfo->getSlotSize(), PtrVT);
+    const X86RegisterInfo *RegInfo =
+      static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
+    SDValue Offset = DAG.getConstant(RegInfo->getSlotSize(), PtrVT);
     return DAG.getLoad(PtrVT, dl, DAG.getEntryNode(),
                        DAG.getNode(ISD::ADD, dl, PtrVT,
                                    FrameAddr, Offset),
@@ -11248,6 +11260,8 @@ SDValue X86TargetLowering::LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const {
   EVT VT = Op.getValueType();
   SDLoc dl(Op);  // FIXME probably not meaningful
   unsigned Depth = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   unsigned FrameReg;
   // @LOCALMOD
   if (Subtarget->isTargetNaCl()) {
@@ -11268,6 +11282,8 @@ SDValue X86TargetLowering::LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const {
 
 SDValue X86TargetLowering::LowerFRAME_TO_ARGS_OFFSET(SDValue Op,
                                                      SelectionDAG &DAG) const {
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   return DAG.getIntPtrConstant(2 * RegInfo->getSlotSize());
 }
 
@@ -11281,6 +11297,8 @@ SDValue X86TargetLowering::LowerEH_RETURN(SDValue Op, SelectionDAG &DAG) const {
   // @LOCALMOD-START
   bool Has64BitPointers = Subtarget->has64BitPointers();
   EVT PtrVT = getPointerTy();
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   unsigned FrameReg;
   if (Subtarget->isTargetNaCl()) {
     FrameReg = Subtarget->has64BitPointers() ? X86::RBP : X86::EBP;
@@ -14876,6 +14894,9 @@ X86TargetLowering::emitEHSjLjSetJmp(MachineInstr *MI,
   // Setup
   MIB = BuildMI(*thisMBB, MI, DL, TII->get(X86::EH_SjLj_Setup))
           .addMBB(restoreMBB);
+
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   MIB.addRegMask(RegInfo->getNoPreservedMask());
   thisMBB->addSuccessor(mainMBB);
   thisMBB->addSuccessor(restoreMBB);
@@ -14921,6 +14942,8 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr *MI,
     (PVT == MVT::i64) ? &X86::GR64RegClass : &X86::GR32RegClass;
   unsigned Tmp = MRI.createVirtualRegister(RC);
   // Since FP is only updated here but NOT referenced, it's treated as GPR.
+  const X86RegisterInfo *RegInfo =
+    static_cast<const X86RegisterInfo*>(getTargetMachine().getRegisterInfo());
   unsigned FP = (PVT == MVT::i64) ? X86::RBP : X86::EBP;
   unsigned SP = RegInfo->getStackRegister();
 

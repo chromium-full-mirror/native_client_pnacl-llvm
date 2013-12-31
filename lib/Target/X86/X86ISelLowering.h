@@ -747,7 +747,6 @@ namespace llvm {
     /// Subtarget - Keep a pointer to the X86Subtarget around so that we can
     /// make the right decision when generating code for different targets.
     const X86Subtarget *Subtarget;
-    const X86RegisterInfo *RegInfo;
     const DataLayout *TD;
     // @LOCALMOD - This is essentially a revert of r167104
     /// X86StackPtr - X86 physical register used as stack ptr.
