@@ -17,6 +17,7 @@
 #define LLVM_SUPPORT_DWARF_H
 
 #include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
 
@@ -58,7 +59,8 @@ enum LLVMConstants {
   DWARF_VERSION = 4,       // Default dwarf version we output.
   DW_CIE_VERSION = 1,      // Common frame information version.
   DW_PUBTYPES_VERSION = 2, // Section version number for .debug_pubtypes.
-  DW_PUBNAMES_VERSION = 2  // Section version number for .debug_pubnames.
+  DW_PUBNAMES_VERSION = 2, // Section version number for .debug_pubnames.
+  DW_ARANGES_VERSION = 2   // Section version number for .debug_aranges.
 };
 
 // Special ID values that distinguish a CIE from a FDE in DWARF CFI.
@@ -801,10 +803,14 @@ enum GDBIndexEntryKind {
   GIEK_UNUSED7,
 };
 
+StringRef GDBIndexEntryKindString(GDBIndexEntryKind Kind);
+
 enum GDBIndexEntryLinkage {
   GIEL_EXTERNAL,
   GIEL_STATIC
 };
+
+StringRef GDBIndexEntryLinkageString(GDBIndexEntryLinkage Linkage);
 
 /// The gnu_pub* kind looks like:
 ///
@@ -816,24 +822,24 @@ enum GDBIndexEntryLinkage {
 /// offset of the cu within the debug_info section stored in those 24 bits.
 struct PubIndexEntryDescriptor {
   GDBIndexEntryKind Kind;
-  bool Static;
-  PubIndexEntryDescriptor(GDBIndexEntryKind Kind, bool Static)
-      : Kind(Kind), Static(Static) {}
+  GDBIndexEntryLinkage Linkage;
+  PubIndexEntryDescriptor(GDBIndexEntryKind Kind, GDBIndexEntryLinkage Linkage)
+      : Kind(Kind), Linkage(Linkage) {}
   /* implicit */ PubIndexEntryDescriptor(GDBIndexEntryKind Kind)
-      : Kind(Kind), Static(false) {}
+      : Kind(Kind), Linkage(GIEL_EXTERNAL) {}
   explicit PubIndexEntryDescriptor(uint8_t Value)
       : Kind(static_cast<GDBIndexEntryKind>((Value & KIND_MASK) >>
                                             KIND_OFFSET)),
-        Static(Value & STATIC_MASK) {}
-  uint8_t toBits() {
-    return Kind << KIND_OFFSET | Static << STATIC_OFFSET;
-  }
+        Linkage(static_cast<GDBIndexEntryLinkage>((Value & LINKAGE_MASK) >>
+                                                  LINKAGE_OFFSET)) {}
+  uint8_t toBits() { return Kind << KIND_OFFSET | Linkage << LINKAGE_OFFSET; }
+
 private:
   enum {
     KIND_OFFSET = 4,
     KIND_MASK = 7 << KIND_OFFSET,
-    STATIC_OFFSET = 7,
-    STATIC_MASK = 1 << STATIC_OFFSET
+    LINKAGE_OFFSET = 7,
+    LINKAGE_MASK = 1 << LINKAGE_OFFSET
   };
 };
 
