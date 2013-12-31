@@ -224,12 +224,13 @@ static MCInstPrinter *createARMMCInstPrinter(const Target &T,
   return 0;
 }
 
-static MCRelocationInfo *createMCRelocationInfo(StringRef TT, MCContext &Ctx) {
+static MCRelocationInfo *createARMMCRelocationInfo(StringRef TT,
+                                                   MCContext &Ctx) {
   Triple TheTriple(TT);
   if (TheTriple.isEnvironmentMachO())
     return createARMMachORelocationInfo(Ctx);
   // Default to the stock relocation info.
-  return llvm::createMCRelocationInfo(Ctx);
+  return llvm::createMCRelocationInfo(TT, Ctx);
 }
 
 namespace {
@@ -319,7 +320,7 @@ extern "C" void LLVMInitializeARMTargetMC() {
 
   // Register the MC relocation info.
   TargetRegistry::RegisterMCRelocationInfo(TheARMTarget,
-                                           createMCRelocationInfo);
+                                           createARMMCRelocationInfo);
   TargetRegistry::RegisterMCRelocationInfo(TheThumbTarget,
-                                           createMCRelocationInfo);
+                                           createARMMCRelocationInfo);
 }
