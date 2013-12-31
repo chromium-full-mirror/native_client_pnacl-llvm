@@ -186,6 +186,8 @@ def InMicroMips    :  Predicate<"Subtarget.inMicroMipsMode()">,
                       AssemblerPredicate<"FeatureMicroMips">;
 def NotInMicroMips :  Predicate<"!Subtarget.inMicroMipsMode()">,
                       AssemblerPredicate<"!FeatureMicroMips">;
+def IsLE           :  Predicate<"Subtarget.isLittle()">;
+def IsBE           :  Predicate<"!Subtarget.isLittle()">;
 
 def IsNaCl       :    Predicate<"Subtarget.isTargetNaCl()">;
 def IsNotNaCl    :    Predicate<"!Subtarget.isTargetNaCl()">;
