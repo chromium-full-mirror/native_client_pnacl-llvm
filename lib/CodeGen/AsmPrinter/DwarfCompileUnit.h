@@ -15,6 +15,7 @@
 #define CODEGEN_ASMPRINTER_DWARFCOMPILEUNIT_H
 
 #include "DIE.h"
+#include "DwarfDebug.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringMap.h"
@@ -23,8 +24,6 @@
 
 namespace llvm {
 
-class DwarfDebug;
-class DwarfUnits;
 class MachineLocation;
 class MachineOperand;
 class ConstantInt;
@@ -86,6 +85,12 @@ class CompileUnit {
   /// need DW_AT_containing_type attribute. This attribute points to a DIE that
   /// corresponds to the MDNode mapped with the subprogram DIE.
   DenseMap<DIE *, const MDNode *> ContainingTypeMap;
+
+  // DIEValueAllocator - All DIEValues are allocated through this allocator.
+  BumpPtrAllocator DIEValueAllocator;
+
+  // DIEIntegerOne - A preallocated DIEValue because 1 is used frequently.
+  DIEInteger *DIEIntegerOne;
 
 public:
   CompileUnit(unsigned UID, DIE *D, const MDNode *N, AsmPrinter *A,
@@ -353,11 +358,11 @@ private:
   /// information entry.
   DIEEntry *createDIEEntry(DIE *Entry);
 
-private:
-
-  // DIEValueAllocator - All DIEValues are allocated through this allocator.
-  BumpPtrAllocator DIEValueAllocator;
-  DIEInteger *DIEIntegerOne;
+  /// resolve - Look in the DwarfDebug map for the MDNode that
+  /// corresponds to the reference.
+  template <typename T> T resolve(DIRef<T> Ref) const {
+    return DD->resolve(Ref);
+  }
 };
 
 } // end llvm namespace
