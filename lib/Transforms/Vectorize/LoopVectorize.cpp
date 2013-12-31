@@ -1476,6 +1476,22 @@ InnerLoopVectorizer::createEmptyLoop(LoopVectorizationLegality *Legal) {
   BasicBlock *ScalarPH =
   MiddleBlock->splitBasicBlock(MiddleBlock->getTerminator(), "scalar.ph");
 
+  // Create and register the new vector loop.
+  Loop* Lp = new Loop();
+  Loop *ParentLoop = OrigLoop->getParentLoop();
+
+  // Insert the new loop into the loop nest and register the new basic blocks
+  // before calling any utilities such as SCEV that require valid LoopInfo.
+  if (ParentLoop) {
+    ParentLoop->addChildLoop(Lp);
+    ParentLoop->addBasicBlockToLoop(ScalarPH, LI->getBase());
+    ParentLoop->addBasicBlockToLoop(VectorPH, LI->getBase());
+    ParentLoop->addBasicBlockToLoop(MiddleBlock, LI->getBase());
+  } else {
+    LI->addTopLevelLoop(Lp);
+  }
+  Lp->addBasicBlockToLoop(VecBody, LI->getBase());
+
   // Use this IR builder to create the loop instructions (Phi, Br, Cmp)
   // inside the loop.
   Builder.SetInsertPoint(VecBody->getFirstInsertionPt());
@@ -1530,6 +1546,8 @@ InnerLoopVectorizer::createEmptyLoop(LoopVectorizationLegality *Legal) {
     // Create a new block containing the memory check.
     BasicBlock *CheckBlock = BypassBlock->splitBasicBlock(MemRuntimeCheck,
                                                           "vector.memcheck");
+    if (ParentLoop)
+      ParentLoop->addBasicBlockToLoop(CheckBlock, LI->getBase());
     LoopBypassBlocks.push_back(CheckBlock);
 
     // Replace the branch into the memory check block with a conditional branch
@@ -1696,24 +1714,6 @@ InnerLoopVectorizer::createEmptyLoop(LoopVectorizationLegality *Legal) {
 
   // Get ready to start creating new instructions into the vectorized body.
   Builder.SetInsertPoint(VecBody->getFirstInsertionPt());
-
-  // Create and register the new vector loop.
-  Loop* Lp = new Loop();
-  Loop *ParentLoop = OrigLoop->getParentLoop();
-
-  // Insert the new loop into the loop nest and register the new basic blocks.
-  if (ParentLoop) {
-    ParentLoop->addChildLoop(Lp);
-    for (unsigned I = 1, E = LoopBypassBlocks.size(); I != E; ++I)
-      ParentLoop->addBasicBlockToLoop(LoopBypassBlocks[I], LI->getBase());
-    ParentLoop->addBasicBlockToLoop(ScalarPH, LI->getBase());
-    ParentLoop->addBasicBlockToLoop(VectorPH, LI->getBase());
-    ParentLoop->addBasicBlockToLoop(MiddleBlock, LI->getBase());
-  } else {
-    LI->addTopLevelLoop(Lp);
-  }
-
-  Lp->addBasicBlockToLoop(VecBody, LI->getBase());
 
   // Save the state.
   LoopVectorPreHeader = VectorPH;
@@ -3818,9 +3818,13 @@ bool LoopVectorizationLegality::AddReductionVar(PHINode *Phi,
       // Check if we found the exit user.
       BasicBlock *Parent = Usr->getParent();
       if (!TheLoop->contains(Parent)) {
-        // Exit if you find multiple outside users.
-        if (ExitInstruction != 0)
+        // Exit if you find multiple outside users or if the header phi node is
+        // being used. In this case the user uses the value of the previous
+        // iteration, in which case we would loose "VF-1" iterations of the
+        // reduction operation if we vectorize.
+        if (ExitInstruction != 0 || Cur == Phi)
           return false;
+
         ExitInstruction = Cur;
         continue;
       }
