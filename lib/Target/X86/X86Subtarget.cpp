@@ -289,7 +289,7 @@ void X86Subtarget::AutoDetectSubtargetFeatures() {
       ToggleFeature(X86::FeatureFastUAMem);
     }
 
-    // Set processor type. Currently only Atom is detected.
+    // Set processor type. Currently only Atom or Silvermont (SLM) is detected.
     if (Family == 6 &&
         (Model == 28 || Model == 38 || Model == 39 ||
          Model == 53 || Model == 54)) {
@@ -297,6 +297,10 @@ void X86Subtarget::AutoDetectSubtargetFeatures() {
 
       UseLeaForSP = true;
       ToggleFeature(X86::FeatureLeaForSP);
+    }
+    else if (Family == 6 &&
+        (Model == 55 || Model == 74 || Model == 77)) {
+      X86ProcFamily = IntelSLM;
     }
 
     unsigned MaxExtLevel;
@@ -459,7 +463,7 @@ void X86Subtarget::resetSubtargetFeatures(StringRef CPU, StringRef FS) {
   // new MCSchedModel is used.
   InitMCProcessorInfo(CPUName, FS);
 
-  if (X86ProcFamily == IntelAtom)
+  if (X86ProcFamily == IntelAtom || X86ProcFamily == IntelSLM)
     PostRAScheduler = true;
 
   InstrItins = getInstrItineraryForCPU(CPUName);
