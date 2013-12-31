@@ -104,6 +104,31 @@ unsigned SystemZInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
   return isSimpleMove(MI, FrameIndex, SystemZII::SimpleBDXStore);
 }
 
+bool SystemZInstrInfo::isStackSlotCopy(const MachineInstr *MI,
+                                       int &DestFrameIndex,
+                                       int &SrcFrameIndex) const {
+  // Check for MVC 0(Length,FI1),0(FI2)
+  const MachineFrameInfo *MFI = MI->getParent()->getParent()->getFrameInfo();
+  if (MI->getOpcode() != SystemZ::MVC ||
+      !MI->getOperand(0).isFI() ||
+      MI->getOperand(1).getImm() != 0 ||
+      !MI->getOperand(3).isFI() ||
+      MI->getOperand(4).getImm() != 0)
+    return false;
+
+  // Check that Length covers the full slots.
+  int64_t Length = MI->getOperand(2).getImm();
+  unsigned FI1 = MI->getOperand(0).getIndex();
+  unsigned FI2 = MI->getOperand(3).getIndex();
+  if (MFI->getObjectSize(FI1) != Length ||
+      MFI->getObjectSize(FI2) != Length)
+    return false;
+
+  DestFrameIndex = FI1;
+  SrcFrameIndex = FI2;
+  return true;
+}
+
 bool SystemZInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
                                      MachineBasicBlock *&TBB,
                                      MachineBasicBlock *&FBB,
@@ -326,17 +351,6 @@ static bool isSimpleBD12Move(const MachineInstr *MI, unsigned Flag) {
           MI->getOperand(3).getReg() == 0);
 }
 
-// Return a MachineMemOperand for FrameIndex with flags MMOFlags.
-// Offset is the byte offset from the start of FrameIndex.
-static MachineMemOperand *getFrameMMO(MachineFunction &MF, int FrameIndex,
-                                      uint64_t &Offset, unsigned MMOFlags) {
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
-  const Value *V = PseudoSourceValue::getFixedStack(FrameIndex);
-  return MF.getMachineMemOperand(MachinePointerInfo(V, Offset), MMOFlags,
-                                 MFI->getObjectSize(FrameIndex),
-                                 MFI->getObjectAlignment(FrameIndex));
-}
-
 MachineInstr *
 SystemZInstrInfo::foldMemoryOperandImpl(MachineFunction &MF,
                                         MachineInstr *MI,
@@ -363,36 +377,22 @@ SystemZInstrInfo::foldMemoryOperandImpl(MachineFunction &MF,
   // not valid in cases where the two memories partially overlap; however,
   // that is not a problem here, because we know that one of the memories
   // is a full frame index.
-  //
-  // For now we punt if the load or store is also to a frame index.
-  // In that case we might end up eliminating both of them to out-of-range
-  // offsets, which might then force the register scavenger to spill two
-  // other registers.  The backend can only handle one such scavenger spill
-  // at a time.
   if (OpNum == 0 && MI->hasOneMemOperand()) {
     MachineMemOperand *MMO = *MI->memoperands_begin();
     if (MMO->getSize() == Size && !MMO->isVolatile()) {
       // Handle conversion of loads.
-      if (isSimpleBD12Move(MI, SystemZII::SimpleBDXLoad) &&
-          !MI->getOperand(1).isFI()) {
-        uint64_t Offset = 0;
-        MachineMemOperand *FrameMMO = getFrameMMO(MF, FrameIndex, Offset,
-                                                  MachineMemOperand::MOStore);
+      if (isSimpleBD12Move(MI, SystemZII::SimpleBDXLoad)) {
         return BuildMI(MF, MI->getDebugLoc(), get(SystemZ::MVC))
-          .addFrameIndex(FrameIndex).addImm(Offset).addImm(Size)
+          .addFrameIndex(FrameIndex).addImm(0).addImm(Size)
           .addOperand(MI->getOperand(1)).addImm(MI->getOperand(2).getImm())
-          .addMemOperand(FrameMMO).addMemOperand(MMO);
+          .addMemOperand(MMO);
       }
       // Handle conversion of stores.
-      if (isSimpleBD12Move(MI, SystemZII::SimpleBDXStore) &&
-          !MI->getOperand(1).isFI()) {
-        uint64_t Offset = 0;
-        MachineMemOperand *FrameMMO = getFrameMMO(MF, FrameIndex, Offset,
-                                                  MachineMemOperand::MOLoad);
+      if (isSimpleBD12Move(MI, SystemZII::SimpleBDXStore)) {
         return BuildMI(MF, MI->getDebugLoc(), get(SystemZ::MVC))
           .addOperand(MI->getOperand(1)).addImm(MI->getOperand(2).getImm())
-          .addImm(Size).addFrameIndex(FrameIndex).addImm(Offset)
-          .addMemOperand(MMO).addMemOperand(FrameMMO);
+          .addImm(Size).addFrameIndex(FrameIndex).addImm(0)
+          .addMemOperand(MMO);
       }
     }
   }
@@ -408,15 +408,12 @@ SystemZInstrInfo::foldMemoryOperandImpl(MachineFunction &MF,
       assert(AccessBytes != 0 && "Size of access should be known");
       assert(AccessBytes <= Size && "Access outside the frame index");
       uint64_t Offset = Size - AccessBytes;
-      MachineMemOperand *FrameMMO = getFrameMMO(MF, FrameIndex, Offset,
-                                                MachineMemOperand::MOLoad);
       MachineInstrBuilder MIB = BuildMI(MF, MI->getDebugLoc(), get(MemOpcode));
       for (unsigned I = 0; I < OpNum; ++I)
         MIB.addOperand(MI->getOperand(I));
       MIB.addFrameIndex(FrameIndex).addImm(Offset);
       if (MemDesc.TSFlags & SystemZII::HasIndex)
         MIB.addReg(0);
-      MIB.addMemOperand(FrameMMO);
       return MIB;
     }
   }
