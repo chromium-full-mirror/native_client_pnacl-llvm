@@ -390,14 +390,6 @@ ARMBaseRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   return ARM::SP;
 }
 
-unsigned ARMBaseRegisterInfo::getEHExceptionRegister() const {
-  llvm_unreachable("What is the exception register");
-}
-
-unsigned ARMBaseRegisterInfo::getEHHandlerRegister() const {
-  llvm_unreachable("What is the exception handler register");
-}
-
 /// emitLoadConstPool - Emits a load from constpool to materialize the
 /// specified immediate.
 void ARMBaseRegisterInfo::
