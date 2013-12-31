@@ -8,6 +8,7 @@ add_llvm_library(LLVMMipsDesc
 # LOCALMOD-BEGIN
   MipsMCNaCl.cpp
 # LOCALMOD-END
+  MipsTargetStreamer.cpp
   )
 
 add_dependencies(LLVMMipsDesc MipsCommonTableGen)
