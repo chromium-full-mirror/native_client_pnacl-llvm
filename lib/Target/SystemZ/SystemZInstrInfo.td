@@ -202,12 +202,20 @@ def Select32Mux : SelectWrapper<GRX32>, Requires<[FeatureHighWord]>;
 def Select32    : SelectWrapper<GR32>;
 def Select64    : SelectWrapper<GR64>;
 
-defm CondStore8  : CondStores<GR32, nonvolatile_truncstorei8,
-                              nonvolatile_anyextloadi8, bdxaddr20only>;
-defm CondStore16 : CondStores<GR32, nonvolatile_truncstorei16,
-                              nonvolatile_anyextloadi16, bdxaddr20only>;
-defm CondStore32 : CondStores<GR32, nonvolatile_store,
-                              nonvolatile_load, bdxaddr20only>;
+// We don't define 32-bit Mux stores because the low-only STOC should
+// always be used if possible.
+defm CondStore8Mux  : CondStores<GRX32, nonvolatile_truncstorei8,
+                                 nonvolatile_anyextloadi8, bdxaddr20only>,
+                      Requires<[FeatureHighWord]>;
+defm CondStore16Mux : CondStores<GRX32, nonvolatile_truncstorei16,
+                                 nonvolatile_anyextloadi16, bdxaddr20only>,
+                      Requires<[FeatureHighWord]>;
+defm CondStore8     : CondStores<GR32, nonvolatile_truncstorei8,
+                                 nonvolatile_anyextloadi8, bdxaddr20only>;
+defm CondStore16    : CondStores<GR32, nonvolatile_truncstorei16,
+                                 nonvolatile_anyextloadi16, bdxaddr20only>;
+defm CondStore32    : CondStores<GR32, nonvolatile_store,
+                                 nonvolatile_load, bdxaddr20only>;
 
 defm : CondStores64<CondStore8, CondStore8Inv, nonvolatile_truncstorei8,
                     nonvolatile_anyextloadi8, bdxaddr20only>;
@@ -677,11 +685,16 @@ let Defs = [CC], CCValues = 0xF, CompareZeroCCMask = 0x8 in {
   def AGFR : BinaryRRE<"agf", 0xB918, null_frag, GR64, GR32>;
 
   // Addition of signed 16-bit immediates.
+  defm AHIMux : BinaryRIAndKPseudo<"ahimux", add, GRX32, imm32sx16>;
   defm AHI  : BinaryRIAndK<"ahi",  0xA7A, 0xECD8, add, GR32, imm32sx16>;
   defm AGHI : BinaryRIAndK<"aghi", 0xA7B, 0xECD9, add, GR64, imm64sx16>;
 
   // Addition of signed 32-bit immediates.
+  def AFIMux : BinaryRIPseudo<add, GRX32, simm32>,
+               Requires<[FeatureHighWord]>;
   def AFI  : BinaryRIL<"afi",  0xC29, add, GR32, simm32>;
+  def AIH  : BinaryRIL<"aih",  0xCC8, add, GRH32, simm32>,
+             Requires<[FeatureHighWord]>;
   def AGFI : BinaryRIL<"agfi", 0xC28, add, GR64, imm64sx32>;
 
   // Addition of memory.
@@ -1063,13 +1076,22 @@ let Defs = [CC], CCValues = 0xE in {
   def CHI  : CompareRI<"chi",  0xA7E, z_scmp, GR32, imm32sx16>;
   def CGHI : CompareRI<"cghi", 0xA7F, z_scmp, GR64, imm64sx16>;
 
-  // Comparison with a signed 32-bit immediate.
+  // Comparison with a signed 32-bit immediate.  CFIMux expands to CFI or CIH,
+  // depending on the choice of register.
+  def CFIMux : CompareRIPseudo<z_scmp, GRX32, simm32>,
+               Requires<[FeatureHighWord]>;
   def CFI  : CompareRIL<"cfi",  0xC2D, z_scmp, GR32, simm32>;
+  def CIH  : CompareRIL<"cih",  0xCCD, z_scmp, GRH32, simm32>,
+             Requires<[FeatureHighWord]>;
   def CGFI : CompareRIL<"cgfi", 0xC2C, z_scmp, GR64, imm64sx32>;
 
   // Comparison with memory.
   defm CH    : CompareRXPair<"ch", 0x49, 0xE379, z_scmp, GR32, asextloadi16, 2>;
+  def  CMux  : CompareRXYPseudo<z_scmp, GRX32, load, 4>,
+               Requires<[FeatureHighWord]>;
   defm C     : CompareRXPair<"c",  0x59, 0xE359, z_scmp, GR32, load, 4>;
+  def  CHF   : CompareRXY<"chf", 0xE3CD, z_scmp, GRH32, load, 4>,
+               Requires<[FeatureHighWord]>;
   def  CGH   : CompareRXY<"cgh", 0xE334, z_scmp, GR64, asextloadi16, 2>;
   def  CGF   : CompareRXY<"cgf", 0xE330, z_scmp, GR64, asextloadi32, 4>;
   def  CG    : CompareRXY<"cg",  0xE320, z_scmp, GR64, load, 8>;
@@ -1093,12 +1115,21 @@ let Defs = [CC], CCValues = 0xE, IsLogical = 1 in {
   def CLGFR : CompareRRE<"clgf", 0xB931, null_frag, GR64, GR32>;
   def CLGR  : CompareRRE<"clg",  0xB921, z_ucmp,    GR64, GR64>;
 
-  // Comparison with a signed 32-bit immediate.
+  // Comparison with an unsigned 32-bit immediate.  CLFIMux expands to CLFI
+  // or CLIH, depending on the choice of register.
+  def CLFIMux : CompareRIPseudo<z_ucmp, GRX32, uimm32>,
+                Requires<[FeatureHighWord]>;
   def CLFI  : CompareRIL<"clfi",  0xC2F, z_ucmp, GR32, uimm32>;
+  def CLIH  : CompareRIL<"clih",  0xCCF, z_ucmp, GR32, uimm32>,
+              Requires<[FeatureHighWord]>;
   def CLGFI : CompareRIL<"clgfi", 0xC2E, z_ucmp, GR64, imm64zx32>;
 
   // Comparison with memory.
+  def  CLMux  : CompareRXYPseudo<z_ucmp, GRX32, load, 4>,
+                Requires<[FeatureHighWord]>;
   defm CL     : CompareRXPair<"cl", 0x55, 0xE355, z_ucmp, GR32, load, 4>;
+  def  CLHF   : CompareRXY<"clhf", 0xE3CF, z_ucmp, GRH32, load, 4>,
+                Requires<[FeatureHighWord]>;
   def  CLGF   : CompareRXY<"clgf", 0xE331, z_ucmp, GR64, azextloadi32, 4>;
   def  CLG    : CompareRXY<"clg",  0xE321, z_ucmp, GR64, load, 8>;
   def  CLHRL  : CompareRILPC<"clhrl",  0xC67, z_ucmp, GR32,
@@ -1132,16 +1163,22 @@ let mayLoad = 1, Defs = [CC], Uses = [R0L] in
 
 // Test under mask.
 let Defs = [CC] in {
+  // TMxMux expands to TM[LH]x, depending on the choice of register.
+  def TMLMux : CompareRIPseudo<z_tm_reg, GRX32, imm32ll16>,
+               Requires<[FeatureHighWord]>;
+  def TMHMux : CompareRIPseudo<z_tm_reg, GRX32, imm32lh16>,
+               Requires<[FeatureHighWord]>;
   def TMLL : CompareRI<"tmll", 0xA71, z_tm_reg, GR32, imm32ll16>;
   def TMLH : CompareRI<"tmlh", 0xA70, z_tm_reg, GR32, imm32lh16>;
-
-  def TMHL : CompareRI<"tmhl", 0xA73, z_tm_reg, GR64, imm64hl16>;
-  def TMHH : CompareRI<"tmhh", 0xA72, z_tm_reg, GR64, imm64hh16>;
+  def TMHL : CompareRI<"tmhl", 0xA73, z_tm_reg, GRH32, imm32ll16>;
+  def TMHH : CompareRI<"tmhh", 0xA72, z_tm_reg, GRH32, imm32lh16>;
 
   defm TM : CompareSIPair<"tm", 0x91, 0xEB51, z_tm_mem, anyextloadi8, imm32zx8>;
 }
-def : CompareGR64RI<TMLL, z_tm_reg, imm64ll16>;
-def : CompareGR64RI<TMLH, z_tm_reg, imm64lh16>;
+def : CompareGR64RI<TMLL, z_tm_reg, imm64ll16, subreg_l32>;
+def : CompareGR64RI<TMLH, z_tm_reg, imm64lh16, subreg_l32>;
+def : CompareGR64RI<TMHL, z_tm_reg, imm64hl16, subreg_h32>;
+def : CompareGR64RI<TMHH, z_tm_reg, imm64hh16, subreg_h32>;
 
 //===----------------------------------------------------------------------===//
 // Prefetch

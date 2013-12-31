@@ -590,6 +590,7 @@ i32imm:$COUNT, i32imm:$Enabled),
   let ALT_CONST = 0;
   let WHOLE_QUAD_MODE = 0;
   let BARRIER = 1;
+  let UseNamedOperandTable = 1;
 
   let Inst{31-0} = Word0;
   let Inst{63-32} = Word1;
@@ -2238,7 +2239,7 @@ let isTerminator = 1, usesCustomInserter = 1, isBranch = 1, isBarrier = 1 in {
   def BRANCH : ILFormat<(outs), (ins brtarget:$target),
       "; Pseudo unconditional branch instruction",
       [(br bb:$target)]>;
-  defm BRANCH_COND : BranchConditional<IL_brcond>;
+  defm BRANCH_COND : BranchConditional<IL_brcond, R600_Reg32, R600_Reg32>;
 }
 
 //===---------------------------------------------------------------------===//

@@ -107,6 +107,28 @@ void SystemZInstrInfo::expandRIPseudo(MachineInstr *MI, unsigned LowOpcode,
     MI->getOperand(1).setImm(uint32_t(MI->getOperand(1).getImm()));
 }
 
+// MI is a three-operand RIE-style pseudo instruction.  Replace it with
+// LowOpcode3 if the registers are both low GR32s, otherwise use a move
+// followed by HighOpcode or LowOpcode, depending on whether the target
+// is a high or low GR32.
+void SystemZInstrInfo::expandRIEPseudo(MachineInstr *MI, unsigned LowOpcode,
+                                       unsigned LowOpcodeK,
+                                       unsigned HighOpcode) const {
+  unsigned DestReg = MI->getOperand(0).getReg();
+  unsigned SrcReg = MI->getOperand(1).getReg();
+  bool DestIsHigh = isHighReg(DestReg);
+  bool SrcIsHigh = isHighReg(SrcReg);
+  if (!DestIsHigh && !SrcIsHigh)
+    MI->setDesc(get(LowOpcodeK));
+  else {
+    emitGRX32Move(*MI->getParent(), MI, MI->getDebugLoc(),
+                  DestReg, SrcReg, SystemZ::LR, 32,
+                  MI->getOperand(1).isKill());
+    MI->setDesc(get(DestIsHigh ? HighOpcode : LowOpcode));
+    MI->getOperand(1).setReg(DestReg);
+  }
+}
+
 // MI is an RXY-style pseudo instruction.  Replace it with LowOpcode
 // if the first operand is a low GR32 and HighOpcode if the first operand
 // is a high GR32.
@@ -651,6 +673,7 @@ SystemZInstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
                                         LiveVariables *LV) const {
   MachineInstr *MI = MBBI;
   MachineBasicBlock *MBB = MI->getParent();
+  MachineRegisterInfo &MRI = MBB->getParent()->getRegInfo();
 
   unsigned Opcode = MI->getOpcode();
   unsigned NumOps = MI->getNumOperands();
@@ -660,10 +683,23 @@ SystemZInstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
   // because it tends to be shorter and because some instructions
   // have memory forms that can be used during spilling.
   if (TM.getSubtargetImpl()->hasDistinctOps()) {
+    MachineOperand &Dest = MI->getOperand(0);
+    MachineOperand &Src = MI->getOperand(1);
+    unsigned DestReg = Dest.getReg();
+    unsigned SrcReg = Src.getReg();
+    // AHIMux is only really a three-operand instruction when both operands
+    // are low registers.  Try to constrain both operands to be low if
+    // possible.
+    if (Opcode == SystemZ::AHIMux &&
+        TargetRegisterInfo::isVirtualRegister(DestReg) &&
+        TargetRegisterInfo::isVirtualRegister(SrcReg) &&
+        MRI.getRegClass(DestReg)->contains(SystemZ::R1L) &&
+        MRI.getRegClass(SrcReg)->contains(SystemZ::R1L)) {
+      MRI.constrainRegClass(DestReg, &SystemZ::GR32BitRegClass);
+      MRI.constrainRegClass(SrcReg, &SystemZ::GR32BitRegClass);
+    }
     int ThreeOperandOpcode = SystemZ::getThreeOperandOpcode(Opcode);
     if (ThreeOperandOpcode >= 0) {
-      MachineOperand &Dest = MI->getOperand(0);
-      MachineOperand &Src = MI->getOperand(1);
       MachineInstrBuilder MIB =
         BuildMI(*MBB, MBBI, MI->getDebugLoc(), get(ThreeOperandOpcode))
         .addOperand(Dest);
@@ -908,6 +944,42 @@ SystemZInstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
 
   case SystemZ::XIFMux:
     expandRIPseudo(MI, SystemZ::XILF, SystemZ::XIHF, false);
+    return true;
+
+  case SystemZ::TMLMux:
+    expandRIPseudo(MI, SystemZ::TMLL, SystemZ::TMHL, false);
+    return true;
+
+  case SystemZ::TMHMux:
+    expandRIPseudo(MI, SystemZ::TMLH, SystemZ::TMHH, false);
+    return true;
+
+  case SystemZ::AHIMux:
+    expandRIPseudo(MI, SystemZ::AHI, SystemZ::AIH, false);
+    return true;
+
+  case SystemZ::AHIMuxK:
+    expandRIEPseudo(MI, SystemZ::AHI, SystemZ::AHIK, SystemZ::AIH);
+    return true;
+
+  case SystemZ::AFIMux:
+    expandRIPseudo(MI, SystemZ::AFI, SystemZ::AIH, false);
+    return true;
+
+  case SystemZ::CFIMux:
+    expandRIPseudo(MI, SystemZ::CFI, SystemZ::CIH, false);
+    return true;
+
+  case SystemZ::CLFIMux:
+    expandRIPseudo(MI, SystemZ::CLFI, SystemZ::CLIH, false);
+    return true;
+
+  case SystemZ::CMux:
+    expandRXYPseudo(MI, SystemZ::C, SystemZ::CHF);
+    return true;
+
+  case SystemZ::CLMux:
+    expandRXYPseudo(MI, SystemZ::CL, SystemZ::CLHF);
     return true;
 
   case SystemZ::RISBMux: {
