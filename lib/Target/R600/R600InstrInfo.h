@@ -63,6 +63,8 @@ namespace llvm {
 
   /// \returns true if this \p Opcode represents an ALU instruction.
   bool isALUInstr(unsigned Opcode) const;
+  bool hasInstrModifiers(unsigned Opcode) const;
+  bool isLDSInstr(unsigned Opcode) const;
 
   bool isTransOnly(unsigned Opcode) const;
   bool isTransOnly(const MachineInstr *MI) const;
@@ -72,6 +74,8 @@ namespace llvm {
   bool usesTextureCache(unsigned Opcode) const;
   bool usesTextureCache(const MachineInstr *MI) const;
 
+  bool mustBeLastInClause(unsigned Opcode) const;
+
   /// \returns a pair for each src of an ALU instructions.
   /// The first member of a pair is the register id.
   /// If register is ALU_CONST, second member is SEL.
@@ -79,6 +83,15 @@ namespace llvm {
   /// Otherwise, second member value is undefined.
   SmallVector<std::pair<MachineOperand *, int64_t>, 3>
       getSrcs(MachineInstr *MI) const;
+
+  bool isLegal(
+             const std::vector<std::vector<std::pair<int, unsigned> > > &IGSrcs,
+             const std::vector<R600InstrInfo::BankSwizzle> &Swz,
+             unsigned CheckedSize) const;
+  bool recursiveFitsFPLimitation(
+             const std::vector<std::vector<std::pair<int, unsigned> > > &IGSrcs,
+             std::vector<R600InstrInfo::BankSwizzle> &SwzCandidate,
+             unsigned Depth = 0) const;
 
   /// Given the order VEC_012 < VEC_021 < VEC_120 < VEC_102 < VEC_201 < VEC_210
   /// returns true and the first (in lexical order) BankSwizzle affectation
