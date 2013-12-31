@@ -128,7 +128,7 @@ void MemoryBufferTest::testGetOpenFileSlice(bool Reopen) {
   OwningBuffer Buf;
   error_code EC = MemoryBuffer::getOpenFileSlice(TestFD, TestPath.c_str(), Buf,
                                                  40000, // Size
-                                                 8000   // Offset
+                                                 80000  // Offset
                                                  );
   EXPECT_FALSE(EC);
 
@@ -138,6 +138,9 @@ void MemoryBufferTest::testGetOpenFileSlice(bool Reopen) {
   EXPECT_EQ(BufData[9], '9');
 }
 
+#if !defined(_WIN32)
+// FIXME: Investigating since r188998.
+
 TEST_F(MemoryBufferTest, getOpenFileNoReopen) {
   testGetOpenFileSlice(false);
 }
@@ -145,5 +148,7 @@ TEST_F(MemoryBufferTest, getOpenFileNoReopen) {
 TEST_F(MemoryBufferTest, getOpenFileReopened) {
   testGetOpenFileSlice(true);
 }
+
+#endif // _WIN32
 
 }
