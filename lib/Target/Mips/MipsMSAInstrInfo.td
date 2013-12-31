@@ -1764,8 +1764,8 @@ class INSVE_W_DESC : MSA_INSVE_DESC_BASE<"insve.w", int_mips_insve_w, MSA128W>;
 class INSVE_D_DESC : MSA_INSVE_DESC_BASE<"insve.d", int_mips_insve_d, MSA128D>;
 
 class LD_DESC_BASE<string instr_asm, SDPatternOperator OpNode,
-                   ValueType TyNode, RegisterClass RCWD,
-                   Operand MemOpnd = mem, ComplexPattern Addr = addrRegImm,
+                   ValueType TyNode, RegisterClass RCWD, Operand MemOpnd = mem,
+                   ComplexPattern Addr = addrRegImm,
                    InstrItinClass itin = NoItinerary> {
   dag OutOperandList = (outs RCWD:$wd);
   dag InOperandList = (ins MemOpnd:$addr);
@@ -2059,8 +2059,8 @@ class SRLRI_W_DESC : MSA_BIT_W_DESC_BASE<"srlri.w", int_mips_srlri_w, MSA128W>;
 class SRLRI_D_DESC : MSA_BIT_D_DESC_BASE<"srlri.d", int_mips_srlri_d, MSA128D>;
 
 class ST_DESC_BASE<string instr_asm, SDPatternOperator OpNode,
-                   ValueType TyNode, RegisterClass RCWD,
-                   Operand MemOpnd = mem, ComplexPattern Addr = addrRegImm,
+                   ValueType TyNode, RegisterClass RCWD, Operand MemOpnd = mem,
+                   ComplexPattern Addr = addrRegImm,
                    InstrItinClass itin = NoItinerary> {
   dag OutOperandList = (outs);
   dag InOperandList = (ins RCWD:$wd, MemOpnd:$addr);
@@ -2945,6 +2945,20 @@ def ST_FW : MSAPat<(store (v4f32 MSA128W:$ws), addrRegImm:$addr),
                    (ST_W MSA128W:$ws, addrRegImm:$addr)>;
 def ST_FD : MSAPat<(store (v2f64 MSA128D:$ws), addrRegImm:$addr),
                    (ST_D MSA128D:$ws, addrRegImm:$addr)>;
+
+class MSA_FABS_PSEUDO_DESC_BASE<RegisterClass RCWD, RegisterClass RCWS = RCWD,
+                                InstrItinClass itin = NoItinerary> :
+  MipsPseudo<(outs RCWD:$wd),
+             (ins RCWS:$ws),
+             [(set RCWD:$wd, (fabs RCWS:$ws))]> {
+  InstrItinClass Itinerary = itin;
+}
+def FABS_W : MSA_FABS_PSEUDO_DESC_BASE<MSA128W>,
+             PseudoInstExpansion<(FMAX_A_W MSA128W:$wd, MSA128W:$ws,
+                                           MSA128W:$ws)>;
+def FABS_D : MSA_FABS_PSEUDO_DESC_BASE<MSA128D>,
+             PseudoInstExpansion<(FMAX_A_D MSA128D:$wd, MSA128D:$ws,
+                                           MSA128D:$ws)>;
 
 class MSABitconvertPat<ValueType DstVT, ValueType SrcVT,
                        RegisterClass DstRC, list<Predicate> preds = [HasMSA]> :
