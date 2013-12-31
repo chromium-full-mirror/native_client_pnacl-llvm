@@ -9934,7 +9934,6 @@ static SDValue Lower256IntVSETCC(SDValue Op, SelectionDAG &DAG) {
 }
 
 static SDValue LowerIntVSETCC_AVX512(SDValue Op, SelectionDAG &DAG) {
-  SDValue Cond;
   SDValue Op0 = Op.getOperand(0);
   SDValue Op1 = Op.getOperand(1);
   SDValue CC = Op.getOperand(2);
@@ -9970,7 +9969,6 @@ static SDValue LowerIntVSETCC_AVX512(SDValue Op, SelectionDAG &DAG) {
 
 static SDValue LowerVSETCC(SDValue Op, const X86Subtarget *Subtarget,
                            SelectionDAG &DAG) {
-  SDValue Cond;
   SDValue Op0 = Op.getOperand(0);
   SDValue Op1 = Op.getOperand(1);
   SDValue CC = Op.getOperand(2);

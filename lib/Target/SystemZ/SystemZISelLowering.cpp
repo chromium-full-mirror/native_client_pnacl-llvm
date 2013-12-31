@@ -2874,6 +2874,7 @@ SystemZTargetLowering::emitStringWrapper(MachineInstr *MI,
 MachineBasicBlock *SystemZTargetLowering::
 EmitInstrWithCustomInserter(MachineInstr *MI, MachineBasicBlock *MBB) const {
   switch (MI->getOpcode()) {
+  case SystemZ::Select32Mux:
   case SystemZ::Select32:
   case SystemZ::SelectF32:
   case SystemZ::Select64:
@@ -2989,14 +2990,14 @@ EmitInstrWithCustomInserter(MachineInstr *MI, MachineBasicBlock *MBB) const {
     return emitAtomicLoadBinary(MI, MBB, SystemZ::OILL64, 64);
   case SystemZ::ATOMIC_LOAD_OILH64:
     return emitAtomicLoadBinary(MI, MBB, SystemZ::OILH64, 64);
-  case SystemZ::ATOMIC_LOAD_OIHL:
-    return emitAtomicLoadBinary(MI, MBB, SystemZ::OIHL, 64);
-  case SystemZ::ATOMIC_LOAD_OIHH:
-    return emitAtomicLoadBinary(MI, MBB, SystemZ::OIHH, 64);
+  case SystemZ::ATOMIC_LOAD_OIHL64:
+    return emitAtomicLoadBinary(MI, MBB, SystemZ::OIHL64, 64);
+  case SystemZ::ATOMIC_LOAD_OIHH64:
+    return emitAtomicLoadBinary(MI, MBB, SystemZ::OIHH64, 64);
   case SystemZ::ATOMIC_LOAD_OILF64:
     return emitAtomicLoadBinary(MI, MBB, SystemZ::OILF64, 64);
-  case SystemZ::ATOMIC_LOAD_OIHF:
-    return emitAtomicLoadBinary(MI, MBB, SystemZ::OIHF, 64);
+  case SystemZ::ATOMIC_LOAD_OIHF64:
+    return emitAtomicLoadBinary(MI, MBB, SystemZ::OIHF64, 64);
 
   case SystemZ::ATOMIC_LOADW_XR:
     return emitAtomicLoadBinary(MI, MBB, SystemZ::XR, 0);

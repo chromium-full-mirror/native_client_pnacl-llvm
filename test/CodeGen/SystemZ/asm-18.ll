@@ -192,3 +192,206 @@ define void @f8(i16 *%ptr1, i16 *%ptr2) {
   store i16 %trunc2, i16 *%ptr4
   ret void
 }
+
+; Test zero extensions from 8 bits between mixtures of high and low registers.
+define i32 @f9(i8 %val1, i8 %val2) {
+; CHECK-LABEL: f9:
+; CHECK-DAG: risbhg [[REG1:%r[0-5]]], %r2, 24, 159, 32
+; CHECK-DAG: llcr [[REG2:%r[0-5]]], %r3
+; CHECK: stepa [[REG1]], [[REG2]]
+; CHECK: risbhg [[REG3:%r[0-5]]], [[REG1]], 24, 159, 0
+; CHECK: stepb [[REG3]]
+; CHECK: risblg %r2, [[REG3]], 24, 159, 32
+; CHECK: br %r14
+  %ext1 = zext i8 %val1 to i32
+  %ext2 = zext i8 %val2 to i32
+  %val3 = call i8 asm sideeffect "stepa $0, $1", "=h,0,r"(i32 %ext1, i32 %ext2)
+  %ext3 = zext i8 %val3 to i32
+  %val4 = call i8 asm sideeffect "stepb $0", "=h,0"(i32 %ext3)
+  %ext4 = zext i8 %val4 to i32
+  ret i32 %ext4
+}
+
+; Test zero extensions from 16 bits between mixtures of high and low registers.
+define i32 @f10(i16 %val1, i16 %val2) {
+; CHECK-LABEL: f10:
+; CHECK-DAG: risbhg [[REG1:%r[0-5]]], %r2, 16, 159, 32
+; CHECK-DAG: llhr [[REG2:%r[0-5]]], %r3
+; CHECK: stepa [[REG1]], [[REG2]]
+; CHECK: risbhg [[REG3:%r[0-5]]], [[REG1]], 16, 159, 0
+; CHECK: stepb [[REG3]]
+; CHECK: risblg %r2, [[REG3]], 16, 159, 32
+; CHECK: br %r14
+  %ext1 = zext i16 %val1 to i32
+  %ext2 = zext i16 %val2 to i32
+  %val3 = call i16 asm sideeffect "stepa $0, $1", "=h,0,r"(i32 %ext1, i32 %ext2)
+  %ext3 = zext i16 %val3 to i32
+  %val4 = call i16 asm sideeffect "stepb $0", "=h,0"(i32 %ext3)
+  %ext4 = zext i16 %val4 to i32
+  ret i32 %ext4
+}
+
+; Test loads of 16-bit constants into mixtures of high and low registers.
+define void @f11() {
+; CHECK-LABEL: f11:
+; CHECK-DAG: iihf [[REG1:%r[0-5]]], 4294934529
+; CHECK-DAG: lhi [[REG2:%r[0-5]]], -32768
+; CHECK-DAG: llihl [[REG3:%r[0-5]]], 32766
+; CHECK-DAG: lhi [[REG4:%r[0-5]]], 32767
+; CHECK: blah [[REG1]], [[REG2]], [[REG3]], [[REG4]]
+; CHECK: br %r14
+  call void asm sideeffect "blah $0, $1, $2, $3",
+                           "h,r,h,r"(i32 -32767, i32 -32768,
+                                     i32 32766, i32 32767)
+  ret void
+}
+
+; Test loads of unsigned constants into mixtures of high and low registers.
+; For stepc, we expect the h and r operands to be paired by the register
+; allocator.  It doesn't really matter which comes first: LLILL/IIHF would
+; be just as good.
+define void @f12() {
+; CHECK-LABEL: f12:
+; CHECK-DAG: llihl [[REG1:%r[0-5]]], 32768
+; CHECK-DAG: llihl [[REG2:%r[0-5]]], 65535
+; CHECK-DAG: llihh [[REG3:%r[0-5]]], 1
+; CHECK-DAG: llihh [[REG4:%r[0-5]]], 65535
+; CHECK: stepa [[REG1]], [[REG2]], [[REG3]], [[REG4]]
+; CHECK-DAG: llill [[REG1:%r[0-5]]], 32769
+; CHECK-DAG: llill [[REG2:%r[0-5]]], 65534
+; CHECK-DAG: llilh [[REG3:%r[0-5]]], 2
+; CHECK-DAG: llilh [[REG4:%r[0-5]]], 65534
+; CHECK: stepb [[REG1]], [[REG2]], [[REG3]], [[REG4]]
+; CHECK-DAG: llihl [[REG1:%r[0-5]]], 32770
+; CHECK-DAG: iilf [[REG1]], 65533
+; CHECK-DAG: llihh [[REG2:%r[0-5]]], 4
+; CHECK-DAG: iilf [[REG2]], 524288
+; CHECK: stepc [[REG1]], [[REG1]], [[REG2]], [[REG2]]
+; CHECK-DAG: iihf [[REG1:%r[0-5]]], 3294967296
+; CHECK-DAG: iilf [[REG2:%r[0-5]]], 4294567296
+; CHECK-DAG: iihf [[REG3:%r[0-5]]], 1000000000
+; CHECK-DAG: iilf [[REG4:%r[0-5]]], 400000
+; CHECK: stepd [[REG1]], [[REG2]], [[REG3]], [[REG4]]
+; CHECK: br %r14
+  call void asm sideeffect "stepa $0, $1, $2, $3",
+                           "h,h,h,h"(i32 32768, i32 65535,
+                                     i32 65536, i32 -65536)
+  call void asm sideeffect "stepb $0, $1, $2, $3",
+                           "r,r,r,r"(i32 32769, i32 65534,
+                                     i32 131072, i32 -131072)
+  call void asm sideeffect "stepc $0, $1, $2, $3",
+                           "h,r,h,r"(i32 32770, i32 65533,
+                                     i32 262144, i32 524288)
+  call void asm sideeffect "stepd $0, $1, $2, $3",
+                           "h,r,h,r"(i32 -1000000000, i32 -400000,
+                                     i32 1000000000, i32 400000)
+  ret void
+}
+
+; Test selects involving high registers.
+define void @f13(i32 %x, i32 %y) {
+; CHECK-LABEL: f13:
+; CHECK: llihl [[REG:%r[0-5]]], 0
+; CHECK: cije %r2, 0
+; CHECK: iihf [[REG]], 2102030405
+; CHECK: blah [[REG]]
+; CHECK: br %r14
+  %cmp = icmp eq i32 %x, 0
+  %val = select i1 %cmp, i32 0, i32 2102030405
+  call void asm sideeffect "blah $0", "h"(i32 %val)
+  ret void
+}
+
+; Test selects involving low registers.
+define void @f14(i32 %x, i32 %y) {
+; CHECK-LABEL: f14:
+; CHECK: lhi [[REG:%r[0-5]]], 0
+; CHECK: cije %r2, 0
+; CHECK: iilf [[REG]], 2102030405
+; CHECK: blah [[REG]]
+; CHECK: br %r14
+  %cmp = icmp eq i32 %x, 0
+  %val = select i1 %cmp, i32 0, i32 2102030405
+  call void asm sideeffect "blah $0", "r"(i32 %val)
+  ret void
+}
+
+; Test immediate insertion involving high registers.
+define void @f15() {
+; CHECK-LABEL: f15:
+; CHECK: stepa [[REG:%r[0-5]]]
+; CHECK: iihh [[REG]], 4660
+; CHECK: stepb [[REG]]
+; CHECK: iihl [[REG]], 34661
+; CHECK: stepc [[REG]]
+; CHECK: br %r14
+  %res1 = call i32 asm "stepa $0", "=h"()
+  %and1 = and i32 %res1, 65535
+  %or1 = or i32 %and1, 305397760
+  %res2 = call i32 asm "stepb $0, $1", "=h,h"(i32 %or1)
+  %and2 = and i32 %res2, -65536
+  %or2 = or i32 %and2, 34661
+  call void asm sideeffect "stepc $0", "h"(i32 %or2)
+  ret void
+}
+
+; Test immediate insertion involving low registers.
+define void @f16() {
+; CHECK-LABEL: f16:
+; CHECK: stepa [[REG:%r[0-5]]]
+; CHECK: iilh [[REG]], 4660
+; CHECK: stepb [[REG]]
+; CHECK: iill [[REG]], 34661
+; CHECK: stepc [[REG]]
+; CHECK: br %r14
+  %res1 = call i32 asm "stepa $0", "=r"()
+  %and1 = and i32 %res1, 65535
+  %or1 = or i32 %and1, 305397760
+  %res2 = call i32 asm "stepb $0, $1", "=r,r"(i32 %or1)
+  %and2 = and i32 %res2, -65536
+  %or2 = or i32 %and2, 34661
+  call void asm sideeffect "stepc $0", "r"(i32 %or2)
+  ret void
+}
+
+; Test immediate OR involving high registers.
+define void @f17() {
+; CHECK-LABEL: f17:
+; CHECK: stepa [[REG:%r[0-5]]]
+; CHECK: oihh [[REG]], 4660
+; CHECK: stepb [[REG]]
+; CHECK: oihl [[REG]], 34661
+; CHECK: stepc [[REG]]
+; CHECK: oihf [[REG]], 12345678
+; CHECK: stepd [[REG]]
+; CHECK: br %r14
+  %res1 = call i32 asm "stepa $0", "=h"()
+  %or1 = or i32 %res1, 305397760
+  %res2 = call i32 asm "stepb $0, $1", "=h,h"(i32 %or1)
+  %or2 = or i32 %res2, 34661
+  %res3 = call i32 asm "stepc $0, $1", "=h,h"(i32 %or2)
+  %or3 = or i32 %res3, 12345678
+  call void asm sideeffect "stepd $0", "h"(i32 %or3)
+  ret void
+}
+
+; Test immediate OR involving low registers.
+define void @f18() {
+; CHECK-LABEL: f18:
+; CHECK: stepa [[REG:%r[0-5]]]
+; CHECK: oilh [[REG]], 4660
+; CHECK: stepb [[REG]]
+; CHECK: oill [[REG]], 34661
+; CHECK: stepc [[REG]]
+; CHECK: oilf [[REG]], 12345678
+; CHECK: stepd [[REG]]
+; CHECK: br %r14
+  %res1 = call i32 asm "stepa $0", "=r"()
+  %or1 = or i32 %res1, 305397760
+  %res2 = call i32 asm "stepb $0, $1", "=r,r"(i32 %or1)
+  %or2 = or i32 %res2, 34661
+  %res3 = call i32 asm "stepc $0, $1", "=r,r"(i32 %or2)
+  %or3 = or i32 %res3, 12345678
+  call void asm sideeffect "stepd $0", "r"(i32 %or3)
+  ret void
+}

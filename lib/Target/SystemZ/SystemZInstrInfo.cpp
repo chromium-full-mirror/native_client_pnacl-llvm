@@ -91,6 +91,22 @@ void SystemZInstrInfo::splitAdjDynAlloc(MachineBasicBlock::iterator MI) const {
   OffsetMO.setImm(Offset);
 }
 
+// MI is an RI-style pseudo instruction.  Replace it with LowOpcode
+// if the first operand is a low GR32 and HighOpcode if the first operand
+// is a high GR32.  ConvertHigh is true if LowOpcode takes a signed operand
+// and HighOpcode takes an unsigned 32-bit operand.  In those cases,
+// MI has the same kind of operand as LowOpcode, so needs to be converted
+// if HighOpcode is used.
+void SystemZInstrInfo::expandRIPseudo(MachineInstr *MI, unsigned LowOpcode,
+                                      unsigned HighOpcode,
+                                      bool ConvertHigh) const {
+  unsigned Reg = MI->getOperand(0).getReg();
+  bool IsHigh = isHighReg(Reg);
+  MI->setDesc(get(IsHigh ? HighOpcode : LowOpcode));
+  if (IsHigh && ConvertHigh)
+    MI->getOperand(1).setImm(uint32_t(MI->getOperand(1).getImm()));
+}
+
 // MI is an RXY-style pseudo instruction.  Replace it with LowOpcode
 // if the first operand is a low GR32 and HighOpcode if the first operand
 // is a high GR32.
@@ -100,6 +116,17 @@ void SystemZInstrInfo::expandRXYPseudo(MachineInstr *MI, unsigned LowOpcode,
   unsigned Opcode = getOpcodeForOffset(isHighReg(Reg) ? HighOpcode : LowOpcode,
                                        MI->getOperand(2).getImm());
   MI->setDesc(get(Opcode));
+}
+
+// MI is an RR-style pseudo instruction that zero-extends the low Size bits
+// of one GRX32 into another.  Replace it with LowOpcode if both operands
+// are low registers, otherwise use RISB[LH]G.
+void SystemZInstrInfo::expandZExtPseudo(MachineInstr *MI, unsigned LowOpcode,
+                                        unsigned Size) const {
+  emitGRX32Move(*MI->getParent(), MI, MI->getDebugLoc(),
+                MI->getOperand(0).getReg(), MI->getOperand(1).getReg(),
+                LowOpcode, Size, MI->getOperand(1).isKill());
+  MI->eraseFromParent();
 }
 
 // Emit a zero-extending move from 32-bit GPR SrcReg to 32-bit GPR
@@ -814,6 +841,14 @@ SystemZInstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
     expandRXYPseudo(MI, SystemZ::LH, SystemZ::LHH);
     return true;
 
+  case SystemZ::LLCRMux:
+    expandZExtPseudo(MI, SystemZ::LLCR, 8);
+    return true;
+
+  case SystemZ::LLHRMux:
+    expandZExtPseudo(MI, SystemZ::LLHR, 16);
+    return true;
+
   case SystemZ::LLCMux:
     expandRXYPseudo(MI, SystemZ::LLC, SystemZ::LLCH);
     return true;
@@ -836,6 +871,34 @@ SystemZInstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
 
   case SystemZ::STMux:
     expandRXYPseudo(MI, SystemZ::ST, SystemZ::STFH);
+    return true;
+
+  case SystemZ::LHIMux:
+    expandRIPseudo(MI, SystemZ::LHI, SystemZ::IIHF, true);
+    return true;
+
+  case SystemZ::IIFMux:
+    expandRIPseudo(MI, SystemZ::IILF, SystemZ::IIHF, false);
+    return true;
+
+  case SystemZ::IILMux:
+    expandRIPseudo(MI, SystemZ::IILL, SystemZ::IIHL, false);
+    return true;
+
+  case SystemZ::IIHMux:
+    expandRIPseudo(MI, SystemZ::IILH, SystemZ::IIHH, false);
+    return true;
+
+  case SystemZ::OIFMux:
+    expandRIPseudo(MI, SystemZ::OILF, SystemZ::OIHF, false);
+    return true;
+
+  case SystemZ::OILMux:
+    expandRIPseudo(MI, SystemZ::OILL, SystemZ::OIHL, false);
+    return true;
+
+  case SystemZ::OIHMux:
+    expandRIPseudo(MI, SystemZ::OILH, SystemZ::OIHH, false);
     return true;
 
   case SystemZ::ADJDYNALLOC:
