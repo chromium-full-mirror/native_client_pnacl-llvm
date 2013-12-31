@@ -50,6 +50,7 @@ X86_32TargetMachine::X86_32TargetMachine(const Target &T, StringRef TT,
     TLInfo(*this),
     TSInfo(*this),
     JITInfo(*this) {
+  initAsmInfo();
 }
 
 void X86_64TargetMachine::anchor() { }
@@ -71,6 +72,7 @@ X86_64TargetMachine::X86_64TargetMachine(const Target &T, StringRef TT,
     TLInfo(*this),
     TSInfo(*this),
     JITInfo(*this) {
+  initAsmInfo();
 }
 
 /// X86TargetMachine ctor - Create an X86 target.
