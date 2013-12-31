@@ -72,6 +72,7 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 
 using namespace llvm;
@@ -255,7 +256,6 @@ bool SIFixSGPRCopies::runOnMachineFunction(MachineFunction &MF) {
         DEBUG(MI.print(dbgs()));
 
         TII->moveToVALU(MI);
-        TII->legalizeOperands(&MI);
         break;
       }
       }
