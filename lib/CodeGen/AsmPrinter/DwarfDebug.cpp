@@ -718,14 +718,13 @@ unsigned DwarfDebug::getOrCreateSourceID(StringRef FileName,
 
 // Create new CompileUnit for the given metadata node with tag
 // DW_TAG_compile_unit.
-CompileUnit *DwarfDebug::constructCompileUnit(const MDNode *N) {
-  DICompileUnit DIUnit(N);
+CompileUnit *DwarfDebug::constructCompileUnit(DICompileUnit DIUnit) {
   StringRef FN = DIUnit.getFilename();
   CompilationDir = DIUnit.getDirectory();
 
   DIE *Die = new DIE(dwarf::DW_TAG_compile_unit);
-  CompileUnit *NewCU =
-      new CompileUnit(GlobalCUIndexCount++, Die, N, Asm, this, &InfoHolder);
+  CompileUnit *NewCU = new CompileUnit(GlobalCUIndexCount++, Die, DIUnit, Asm,
+                                       this, &InfoHolder);
 
   FileIDCUMap[NewCU->getUniqueID()] = 0;
   // Call this to emit a .file directive if it wasn't emitted for the source
@@ -818,7 +817,7 @@ CompileUnit *DwarfDebug::constructCompileUnit(const MDNode *N) {
 
   InfoHolder.addUnit(NewCU);
 
-  CUMap.insert(std::make_pair(N, NewCU));
+  CUMap.insert(std::make_pair(DIUnit, NewCU));
   CUDieMap.insert(std::make_pair(Die, NewCU));
   return NewCU;
 }
@@ -2119,7 +2118,7 @@ void DwarfDebug::emitDIE(DIE *Die, ArrayRef<DIEAbbrev *> Abbrevs) {
     case dwarf::DW_AT_location: {
       if (DIELabel *L = dyn_cast<DIELabel>(Values[i])) {
         if (Asm->MAI->doesDwarfUseRelocationsAcrossSections())
-          Asm->EmitLabelReference(L->getValue(), 4);
+          Asm->EmitSectionOffset(L->getValue(), DwarfDebugLocSectionSym);
         else
           Asm->EmitLabelDifference(L->getValue(), DwarfDebugLocSectionSym, 4);
       } else {
@@ -2955,7 +2954,7 @@ CompileUnit *DwarfDebug::constructSkeletonCU(const CompileUnit *CU) {
                                        Asm, this, &SkeletonHolder);
 
   NewCU->addLocalString(Die, dwarf::DW_AT_GNU_dwo_name,
-                        DICompileUnit(CU->getNode()).getSplitDebugFilename());
+                        CU->getNode().getSplitDebugFilename());
 
   // Relocate to the beginning of the addr_base section, else 0 for the
   // beginning of the one for this compile unit.

@@ -40,7 +40,7 @@ class CompileUnit {
   unsigned UniqueID;
 
   /// Node - MDNode for the compile unit.
-  const MDNode *Node;
+  DICompileUnit Node;
 
   /// CUDie - Compile unit debug information entry.
   ///
@@ -94,14 +94,14 @@ class CompileUnit {
   DIEInteger *DIEIntegerOne;
 
 public:
-  CompileUnit(unsigned UID, DIE *D, const MDNode *N, AsmPrinter *A,
+  CompileUnit(unsigned UID, DIE *D, DICompileUnit CU, AsmPrinter *A,
               DwarfDebug *DW, DwarfUnits *DWU);
   ~CompileUnit();
 
   // Accessors.
   unsigned getUniqueID() const { return UniqueID; }
-  uint16_t getLanguage() const { return DICompileUnit(Node).getLanguage(); }
-  const MDNode *getNode() const { return Node; }
+  uint16_t getLanguage() const { return Node.getLanguage(); }
+  DICompileUnit getNode() const { return Node; }
   DIE *getCUDie() const { return CUDie.get(); }
   const StringMap<DIE *> &getGlobalNames() const { return GlobalNames; }
   const StringMap<DIE *> &getGlobalTypes() const { return GlobalTypes; }
@@ -321,7 +321,7 @@ public:
 
   /// Create a DIE with the given Tag, add the DIE to its parent, and
   /// call insertDIE if MD is not null.
-  DIE *createAndAddDIE(unsigned Tag, DIE &Parent, const MDNode *MD = NULL);
+  DIE *createAndAddDIE(unsigned Tag, DIE &Parent, DIDescriptor N = DIDescriptor());
 
   /// Compute the size of a header for this unit, not including the initial
   /// length field.

@@ -33,12 +33,12 @@
 using namespace llvm;
 
 /// CompileUnit - Compile unit constructor.
-CompileUnit::CompileUnit(unsigned UID, DIE *D, const MDNode *N, AsmPrinter *A,
-                         DwarfDebug *DW, DwarfUnits *DWU)
-    : UniqueID(UID), Node(N), CUDie(D), Asm(A), DD(DW), DU(DWU), IndexTyDie(0),
-      DebugInfoOffset(0) {
+CompileUnit::CompileUnit(unsigned UID, DIE *D, DICompileUnit Node,
+                         AsmPrinter *A, DwarfDebug *DW, DwarfUnits *DWU)
+    : UniqueID(UID), Node(Node), CUDie(D), Asm(A), DD(DW), DU(DWU),
+      IndexTyDie(0), DebugInfoOffset(0) {
   DIEIntegerOne = new (DIEValueAllocator) DIEInteger(1);
-  insertDIE(DIDescriptor(N), D);
+  insertDIE(Node, D);
 }
 
 /// ~CompileUnit - Destructor for compile unit.
@@ -57,7 +57,7 @@ DIEEntry *CompileUnit::createDIEEntry(DIE *Entry) {
 /// getDefaultLowerBound - Return the default lower bound for an array. If the
 /// DWARF version doesn't handle the language, return -1.
 int64_t CompileUnit::getDefaultLowerBound() const {
-  switch (DICompileUnit(Node).getLanguage()) {
+  switch (getLanguage()) {
   default:
     break;
 
@@ -296,11 +296,11 @@ void CompileUnit::addDIEEntry(DIE *Die, dwarf::Attribute Attribute,
 
 /// Create a DIE with the given Tag, add the DIE to its parent, and
 /// call insertDIE if MD is not null.
-DIE *CompileUnit::createAndAddDIE(unsigned Tag, DIE &Parent, const MDNode *MD) {
+DIE *CompileUnit::createAndAddDIE(unsigned Tag, DIE &Parent, DIDescriptor N) {
   DIE *Die = new DIE(Tag);
   Parent.addChild(Die);
-  if (MD)
-    insertDIE(DIDescriptor(MD), Die);
+  if (N)
+    insertDIE(N, Die);
   return Die;
 }
 
@@ -886,10 +886,7 @@ DIE *CompileUnit::getOrCreateTypeDIE(const MDNode *TyNode) {
   // Construct the context before querying for the existence of the DIE in case
   // such construction creates the DIE.
   DIE *ContextDIE = getOrCreateContextDIE(resolve(Ty.getContext()));
-  // TODO: Investigate if this beavior is intentional and possibly
-  // replace it with an assert.
-  if (!ContextDIE)
-    ContextDIE = getCUDie();
+  assert(ContextDIE);
 
   DIE *TyDIE = getDIE(Ty);
   if (TyDIE)
@@ -1168,7 +1165,7 @@ void CompileUnit::constructTypeDIE(DIE &Buffer, DICompositeType CTy) {
     }
     // Add prototype flag if we're dealing with a C language and the
     // function has been prototyped.
-    uint16_t Language = DICompileUnit(Node).getLanguage();
+    uint16_t Language = getLanguage();
     if (isPrototyped &&
         (Language == dwarf::DW_LANG_C89 || Language == dwarf::DW_LANG_C99 ||
          Language == dwarf::DW_LANG_ObjC))
@@ -1426,7 +1423,7 @@ DIE *CompileUnit::getOrCreateSubprogramDIE(DISubprogram SP) {
 
   // Add the prototype if we have a prototype and we have a C like
   // language.
-  uint16_t Language = DICompileUnit(Node).getLanguage();
+  uint16_t Language = getLanguage();
   if (SP.isPrototyped() &&
       (Language == dwarf::DW_LANG_C89 || Language == dwarf::DW_LANG_C99 ||
        Language == dwarf::DW_LANG_ObjC))
@@ -1544,7 +1541,7 @@ void CompileUnit::createGlobalVariableDIE(const MDNode *N) {
     DIE *ContextDIE = getOrCreateContextDIE(GVContext);
 
     // Add to map.
-    VariableDIE = createAndAddDIE(GV.getTag(), *ContextDIE, N);
+    VariableDIE = createAndAddDIE(GV.getTag(), *ContextDIE, GV);
 
     // Add name and type.
     addString(VariableDIE, dwarf::DW_AT_name, GV.getDisplayName());
@@ -1594,7 +1591,7 @@ void CompileUnit::createGlobalVariableDIE(const MDNode *N) {
     if (GVContext && GV.isDefinition() && !GVContext.isCompileUnit() &&
         !GVContext.isFile() && !DD->isSubprogramContext(GVContext)) {
       // Create specification DIE.
-      VariableSpecDIE = createAndAddDIE(dwarf::DW_TAG_variable, *CUDie.get());
+      VariableSpecDIE = createAndAddDIE(dwarf::DW_TAG_variable, *CUDie);
       addDIEEntry(VariableSpecDIE, dwarf::DW_AT_specification, VariableDIE);
       addBlock(VariableSpecDIE, dwarf::DW_AT_location, Block);
       // A static member's declaration is already flagged as such.
@@ -1775,7 +1772,9 @@ DIE *CompileUnit::constructVariableDIE(DbgVariable &DV, bool isScopeAbstract) {
 
   unsigned Offset = DV.getDotDebugLocOffset();
   if (Offset != ~0U) {
-    addLabel(VariableDie, dwarf::DW_AT_location, dwarf::DW_FORM_data4,
+    addLabel(VariableDie, dwarf::DW_AT_location,
+             DD->getDwarfVersion() >= 4 ? dwarf::DW_FORM_sec_offset
+                                        : dwarf::DW_FORM_data4,
              Asm->GetTempSymbol("debug_loc", Offset));
     DV.setDIE(VariableDie);
     return VariableDie;
