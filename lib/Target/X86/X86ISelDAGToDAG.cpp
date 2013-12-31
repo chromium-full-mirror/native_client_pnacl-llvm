@@ -159,10 +159,6 @@ namespace {
   /// SelectionDAG operations.
   ///
   class X86DAGToDAGISel : public SelectionDAGISel {
-    /// X86Lowering - This object fully describes how to lower LLVM code to an
-    /// X86-specific SelectionDAG.
-    const X86TargetLowering &X86Lowering;
-
     /// Subtarget - Keep a pointer to the X86Subtarget around so that we can
     /// make the right decision when generating code for different targets.
     const X86Subtarget *Subtarget;
@@ -174,7 +170,6 @@ namespace {
   public:
     explicit X86DAGToDAGISel(X86TargetMachine &tm, CodeGenOpt::Level OptLevel)
       : SelectionDAGISel(tm, OptLevel),
-        X86Lowering(*tm.getTargetLowering()),
         Subtarget(&tm.getSubtarget<X86Subtarget>()),
         OptForSize(false) {}
 
@@ -535,8 +530,9 @@ void X86DAGToDAGISel::PreprocessISelDAG() {
 
     // If the source and destination are SSE registers, then this is a legal
     // conversion that should not be lowered.
-    bool SrcIsSSE = X86Lowering.isScalarFPTypeInSSEReg(SrcVT);
-    bool DstIsSSE = X86Lowering.isScalarFPTypeInSSEReg(DstVT);
+    X86TargetLowering *X86Lowering = (X86TargetLowering*)getTargetLowering();
+    bool SrcIsSSE = X86Lowering->isScalarFPTypeInSSEReg(SrcVT);
+    bool DstIsSSE = X86Lowering->isScalarFPTypeInSSEReg(DstVT);
     if (SrcIsSSE && DstIsSSE)
       continue;
 
@@ -1826,7 +1822,8 @@ void X86DAGToDAGISel::LegalizeAddressingModeForNaCl(SDValue N,
 ///
 SDNode *X86DAGToDAGISel::getGlobalBaseReg() {
   unsigned GlobalBaseReg = getInstrInfo()->getGlobalBaseReg(MF);
-  return CurDAG->getRegister(GlobalBaseReg, TLI->getPointerTy()).getNode();
+  return CurDAG->getRegister(GlobalBaseReg,
+                             getTargetLowering()->getPointerTy()).getNode();
 }
 
 SDNode *X86DAGToDAGISel::SelectAtomic64(SDNode *Node, unsigned Opc) {
