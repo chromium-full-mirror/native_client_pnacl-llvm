@@ -83,7 +83,6 @@ static cl::extrahelp MoreHelp(
 // This enumeration delineates the kinds of operations on an archive
 // that are permitted.
 enum ArchiveOperation {
-  NoOperation,      ///< An operation hasn't been specified
   Print,            ///< Print the contents of the archive
   Delete,           ///< Delete the specified members
   Move,             ///< Move members to end or as given by {a,b,i} modifiers
@@ -205,7 +204,7 @@ ArchiveOperation parseCommandLine() {
   unsigned NumPositional = 0;
 
   // Keep track of which operation was requested
-  ArchiveOperation Operation = NoOperation;
+  ArchiveOperation Operation;
 
   for(unsigned i=0; i<Options.size(); ++i) {
     switch(Options[i]) {
@@ -666,8 +665,7 @@ int main(int argc, char **argv) {
   ArchiveOperation Operation = parseCommandLine();
 
   // Create or open the archive object.
-  bool Exists;
-  if (llvm::sys::fs::exists(ArchiveName, Exists) || !Exists) {
+  if (!llvm::sys::fs::exists(ArchiveName)) {
     // Produce a warning if we should and we're creating the archive
     if (!Create)
       errs() << argv[0] << ": creating " << ArchiveName << "\n";
@@ -697,9 +695,6 @@ int main(int argc, char **argv) {
     case ReplaceOrInsert: haveError = doReplaceOrInsert(&ErrMsg); break;
     case DisplayTable:    haveError = doDisplayTable(&ErrMsg); break;
     case Extract:         haveError = doExtract(&ErrMsg); break;
-    case NoOperation:
-      errs() << argv[0] << ": No operation was selected.\n";
-      break;
   }
   if (haveError) {
     errs() << argv[0] << ": " << ErrMsg << "\n";
