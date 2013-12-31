@@ -5108,7 +5108,8 @@ bool isShuffleMaskConsecutive(ShuffleVectorSDNode *SVOp,
 /// logical left shift of a vector.
 static bool isVectorShiftRight(ShuffleVectorSDNode *SVOp, SelectionDAG &DAG,
                                bool &isLeft, SDValue &ShVal, unsigned &ShAmt) {
-  unsigned NumElems = SVOp->getValueType(0).getVectorNumElements();
+  unsigned NumElems =
+    SVOp->getValueType(0).getSimpleVT().getVectorNumElements();
   unsigned NumZeros = getNumOfConsecutiveZeros(
       SVOp, NumElems, false /* check zeros from right */, DAG,
       SVOp->getMaskElt(0));
@@ -5142,7 +5143,8 @@ static bool isVectorShiftRight(ShuffleVectorSDNode *SVOp, SelectionDAG &DAG,
 /// logical left shift of a vector.
 static bool isVectorShiftLeft(ShuffleVectorSDNode *SVOp, SelectionDAG &DAG,
                               bool &isLeft, SDValue &ShVal, unsigned &ShAmt) {
-  unsigned NumElems = SVOp->getValueType(0).getVectorNumElements();
+  unsigned NumElems =
+    SVOp->getValueType(0).getSimpleVT().getVectorNumElements();
   unsigned NumZeros = getNumOfConsecutiveZeros(
       SVOp, NumElems, true /* check zeros from left */, DAG,
       NumElems - SVOp->getMaskElt(NumElems - 1) - 1);
@@ -5178,7 +5180,7 @@ static bool isVectorShift(ShuffleVectorSDNode *SVOp, SelectionDAG &DAG,
                           bool &isLeft, SDValue &ShVal, unsigned &ShAmt) {
   // Although the logic below support any bitwidth size, there are no
   // shift instructions which handle more than 128-bit vectors.
-  if (!SVOp->getValueType(0).is128BitVector())
+  if (!SVOp->getValueType(0).getSimpleVT().is128BitVector())
     return false;
 
   if (isVectorShiftLeft(SVOp, DAG, isLeft, ShVal, ShAmt) ||
