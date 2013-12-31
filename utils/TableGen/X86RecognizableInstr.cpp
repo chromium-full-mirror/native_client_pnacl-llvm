@@ -546,12 +546,9 @@ RecognizableInstr::filter_ret RecognizableInstr::filter() const {
   if (Name == "PUSH64i16"         ||
       Name == "MOVPQI2QImr"       ||
       Name == "VMOVPQI2QImr"      ||
-      Name == "MMX_MOVD64rrv164"  ||
       Name == "MOV64ri64i32"      ||
       Name == "VMASKMOVDQU64"     ||
-      Name == "VEXTRACTPSrr64"    ||
-      Name == "VMOVQd64rr"        ||
-      Name == "VMOVQs64rr")
+      Name == "VEXTRACTPSrr64")
     return FILTER_WEAK;
 
   // XACQUIRE and XRELEASE reuse REPNE and REP respectively.

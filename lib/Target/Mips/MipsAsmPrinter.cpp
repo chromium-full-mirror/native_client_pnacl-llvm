@@ -19,6 +19,7 @@
 #include "MipsAsmPrinter.h"
 #include "MipsInstrInfo.h"
 #include "MipsMCInstLower.h"
+#include "MipsTargetStreamer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -44,6 +45,10 @@
 #include "llvm/Target/TargetOptions.h"
 
 using namespace llvm;
+
+MipsTargetStreamer &MipsAsmPrinter::getTargetStreamer() {
+  return static_cast<MipsTargetStreamer &>(OutStreamer.getTargetStreamer());
+}
 
 bool MipsAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
   // Initialize TargetLoweringObjectFile.
@@ -241,8 +246,8 @@ void MipsAsmPrinter::EmitFunctionEntryLabel() {
   }
 
   if (Subtarget->inMicroMipsMode())
-    OutStreamer.emitMipsHackSTOCG(CurrentFnSym,
-                                  (unsigned)ELF::STO_MIPS_MICROMIPS);
+    getTargetStreamer().emitMipsHackSTOCG(CurrentFnSym,
+                                          (unsigned)ELF::STO_MIPS_MICROMIPS);
   OutStreamer.EmitLabel(CurrentFnSym);
 }
 
@@ -624,8 +629,8 @@ unsigned MipsAsmPrinter::GetTargetLabelAlign(const MachineInstr *MI) const {
 }
 // @LOCALMOD-END
 
-static void
-emitELFHeaderFlagsCG(MCStreamer &Streamer, const MipsSubtarget &Subtarget) {
+static void emitELFHeaderFlagsCG(MipsTargetStreamer &TargetStreamer,
+                                 const MipsSubtarget &Subtarget) {
   // Update e_header flags
   unsigned EFlags = 0;
 
@@ -664,14 +669,14 @@ emitELFHeaderFlagsCG(MCStreamer &Streamer, const MipsSubtarget &Subtarget) {
   else
     llvm_unreachable("Unsupported relocation model for e_flags");
 
-  Streamer.emitMipsHackELFFlags(EFlags);
+  TargetStreamer.emitMipsHackELFFlags(EFlags);
 }
 
 void MipsAsmPrinter::EmitEndOfAsmFile(Module &M) {
   // Emit Mips ELF register info
   Subtarget->getMReginfo().emitMipsReginfoSectionCG(
              OutStreamer, getObjFileLowering(), *Subtarget);
-  emitELFHeaderFlagsCG(OutStreamer, *Subtarget);
+  emitELFHeaderFlagsCG(getTargetStreamer(), *Subtarget);
 }
 
 void MipsAsmPrinter::PrintDebugValueComment(const MachineInstr *MI,
