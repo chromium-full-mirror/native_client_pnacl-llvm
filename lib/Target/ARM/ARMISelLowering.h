@@ -97,7 +97,6 @@ namespace llvm {
 
       DYN_ALLOC,    // Dynamic allocation on the stack.
 
-      MEMBARRIER,   // Memory barrier (DMB)
       MEMBARRIER_MCR, // Memory barrier (MCR)
 
       PRELOAD,      // Preload

@@ -1053,7 +1053,6 @@ const char *ARMTargetLowering::getTargetNodeName(unsigned Opcode) const {
 
   case ARMISD::DYN_ALLOC:     return "ARMISD::DYN_ALLOC";
 
-  case ARMISD::MEMBARRIER:    return "ARMISD::MEMBARRIER";
   case ARMISD::MEMBARRIER_MCR: return "ARMISD::MEMBARRIER_MCR";
 
   case ARMISD::PRELOAD:       return "ARMISD::PRELOAD";
@@ -2816,7 +2815,8 @@ static SDValue LowerATOMIC_FENCE(SDValue Op, SelectionDAG &DAG,
     Domain = ARM_MB::ISHST;
   }
 
-  return DAG.getNode(ARMISD::MEMBARRIER, dl, MVT::Other, Op.getOperand(0),
+  return DAG.getNode(ISD::INTRINSIC_VOID, dl, MVT::Other, Op.getOperand(0),
+                     DAG.getConstant(Intrinsic::arm_dmb, MVT::i32),
                      DAG.getConstant(Domain, MVT::i32));
 }
 
