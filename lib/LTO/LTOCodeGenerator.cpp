@@ -264,11 +264,6 @@ bool LTOCodeGenerator::determineTarget(std::string &errMsg) {
   if (TargetMach != NULL)
     return true;
 
-  // if options were requested, set them
-  if (!CodegenOptions.empty())
-    cl::ParseCommandLineOptions(CodegenOptions.size(),
-                                const_cast<char **>(&CodegenOptions[0]));
-
   std::string TripleStr = Linker.getModule()->getTargetTriple();
   // @LOCALMOD-BEGIN
   // Pretend that we are ARM for name mangling and assembly conventions.
@@ -479,4 +474,11 @@ void LTOCodeGenerator::setCodeGenDebugOptions(const char *options) {
       CodegenOptions.push_back(strdup("libLLVMLTO"));
     CodegenOptions.push_back(strdup(o.first.str().c_str()));
   }
+}
+
+void LTOCodeGenerator::parseCodeGenDebugOptions() {
+  // if options were requested, set them
+  if (!CodegenOptions.empty())
+    cl::ParseCommandLineOptions(CodegenOptions.size(),
+                                const_cast<char **>(&CodegenOptions[0]));
 }
