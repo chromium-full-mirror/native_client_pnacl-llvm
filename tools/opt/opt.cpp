@@ -488,6 +488,7 @@ static void AddOptimizationPasses(PassManagerBase &MPM,FunctionPassManager &FPM,
                                DisableLoopUnrolling : OptLevel == 0;
   
   Builder.LoopVectorize = OptLevel > 1 && SizeLevel < 2;
+  Builder.SLPVectorize = true;
 
   Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(MPM);
