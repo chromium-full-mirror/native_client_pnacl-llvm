@@ -2736,22 +2736,6 @@ let Predicates = [HasAVX] in {
             (VMOVMSKPDrr32 (COPY_TO_REGCLASS FR64:$src, VR128))>;
   def : Pat<(i64 (X86fgetsign FR64:$src)),
             (VMOVMSKPDrr64 (COPY_TO_REGCLASS FR64:$src, VR128))>;
-
-  // Assembler Only
-  def VMOVMSKPSr64r : PI<0x50, MRMSrcReg, (outs GR64:$dst), (ins VR128:$src),
-             "movmskps\t{$src, $dst|$dst, $src}", [], IIC_SSE_MOVMSK,
-             SSEPackedSingle>, TB, VEX, Sched<[WriteVecLogic]>;
-  def VMOVMSKPDr64r : PI<0x50, MRMSrcReg, (outs GR64:$dst), (ins VR128:$src),
-             "movmskpd\t{$src, $dst|$dst, $src}", [], IIC_SSE_MOVMSK,
-             SSEPackedDouble>, TB,
-             OpSize, VEX, Sched<[WriteVecLogic]>;
-  def VMOVMSKPSYr64r : PI<0x50, MRMSrcReg, (outs GR64:$dst), (ins VR256:$src),
-             "movmskps\t{$src, $dst|$dst, $src}", [], IIC_SSE_MOVMSK,
-             SSEPackedSingle>, TB, VEX, VEX_L, Sched<[WriteVecLogic]>;
-  def VMOVMSKPDYr64r : PI<0x50, MRMSrcReg, (outs GR64:$dst), (ins VR256:$src),
-             "movmskpd\t{$src, $dst|$dst, $src}", [], IIC_SSE_MOVMSK,
-             SSEPackedDouble>, TB,
-             OpSize, VEX, VEX_L, Sched<[WriteVecLogic]>;
 }
 
 defm MOVMSKPS : sse12_extr_sign_mask<VR128, int_x86_sse_movmsk_ps, "movmskps",
@@ -4330,6 +4314,8 @@ def PMOVMSKBrr : PDI<0xD7, MRMSrcReg, (outs GR32:$dst), (ins VR128:$src),
            "pmovmskb\t{$src, $dst|$dst, $src}",
            [(set GR32:$dst, (int_x86_sse2_pmovmskb_128 VR128:$src))],
            IIC_SSE_MOVMSK>;
+def PMOVMSKBr64r : PDI<0xD7, MRMSrcReg, (outs GR64:$dst), (ins VR128:$src),
+           "pmovmskb\t{$src, $dst|$dst, $src}", [], IIC_SSE_MOVMSK>;
 
 } // ExeDomain = SSEPackedInt
 
