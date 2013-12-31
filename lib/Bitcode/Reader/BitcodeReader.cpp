@@ -3283,6 +3283,7 @@ class BitcodeErrorCategoryType : public _do_message {
     case BitcodeReader::InvalidValue:
       return "Invalid value";
     }
+    llvm_unreachable("Unknown error type!");
   }
 };
 }
