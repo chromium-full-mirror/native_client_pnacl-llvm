@@ -1258,8 +1258,6 @@ Value *FuncSLP::vectorizeArith(ArrayRef<Value *> Operands) {
   for (unsigned i = 0, e = Operands.size(); i != e; ++i) {
     Value *S = Builder.CreateExtractElement(Vec, Builder.getInt32(i));
     Operands[i]->replaceAllUsesWith(S);
-    Instruction *I = cast<Instruction>(Operands[i]);
-    I->eraseFromParent();
   }
 
   return Vec;
@@ -1302,7 +1300,7 @@ void FuncSLP::optimizeGatherSequence() {
   // instructions. TODO: We can further optimize this scan if we split the
   // instructions into different buckets based on the insert lane.
   SmallPtrSet<Instruction*, 16> Visited;
-  SmallPtrSet<Instruction*, 16> ToRemove;
+  SmallVector<Instruction*, 16> ToRemove;
   ReversePostOrderTraversal<Function*> RPOT(F);
   for (ReversePostOrderTraversal<Function*>::rpo_iterator I = RPOT.begin(),
        E = RPOT.end(); I != E; ++I) {
@@ -1320,7 +1318,7 @@ void FuncSLP::optimizeGatherSequence() {
         if (Insert->isIdenticalTo(*v) &&
             DT->dominates((*v)->getParent(), Insert->getParent())) {
           Insert->replaceAllUsesWith(*v);
-          ToRemove.insert(Insert);
+          ToRemove.push_back(Insert);
           Insert = 0;
           break;
         }
@@ -1331,7 +1329,7 @@ void FuncSLP::optimizeGatherSequence() {
   }
 
   // Erase all of the instructions that we RAUWed.
-  for (SmallPtrSet<Instruction*, 16>::iterator v = ToRemove.begin(),
+  for (SmallVector<Instruction*, 16>::iterator v = ToRemove.begin(),
        ve = ToRemove.end(); v != ve; ++v) {
     assert((*v)->getNumUses() == 0 && "Can't remove instructions with uses");
     (*v)->eraseFromParent();
@@ -1379,8 +1377,10 @@ struct SLPVectorizer : public FunctionPass {
     // he store instructions.
     FuncSLP R(&F, SE, DL, TTI, AA, LI, DT);
 
-    for (Function::iterator it = F.begin(), e = F.end(); it != e; ++it) {
-      BasicBlock *BB = it;
+    // Scan the blocks in the function in post order.
+    for (po_iterator<BasicBlock*> it = po_begin(&F.getEntryBlock()),
+         e = po_end(&F.getEntryBlock()); it != e; ++it) {
+      BasicBlock *BB = *it;
 
       // Vectorize trees that end at reductions.
       Changed |= vectorizeChainsInBlock(BB, R);
