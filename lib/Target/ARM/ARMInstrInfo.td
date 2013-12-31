@@ -1343,7 +1343,7 @@ class AI_ext_rrot<bits<8> opcod, string opc, PatFrag opnode>
   : AExtI<opcod, (outs GPRnopc:$Rd), (ins GPRnopc:$Rm, rot_imm:$rot),
           IIC_iEXTr, opc, "\t$Rd, $Rm$rot",
           [(set GPRnopc:$Rd, (opnode (rotr GPRnopc:$Rm, rot_imm:$rot)))]>,
-       Requires<[IsARM, HasV6]> {
+       Requires<[IsARM, HasV6]>, Sched<[WriteALUsi]> {
   bits<4> Rd;
   bits<4> Rm;
   bits<2> rot;
@@ -1356,11 +1356,11 @@ class AI_ext_rrot<bits<8> opcod, string opc, PatFrag opnode>
 class AI_ext_rrot_np<bits<8> opcod, string opc>
   : AExtI<opcod, (outs GPRnopc:$Rd), (ins GPRnopc:$Rm, rot_imm:$rot),
           IIC_iEXTr, opc, "\t$Rd, $Rm$rot", []>,
-       Requires<[IsARM, HasV6]> {
+       Requires<[IsARM, HasV6]>, Sched<[WriteALUsi]> {
   bits<2> rot;
   let Inst{19-16} = 0b1111;
   let Inst{11-10} = rot;
-}
+ }
 
 /// AI_exta_rrot - A binary operation with two forms: one whose operand is a
 /// register and one whose operand is a register rotated by 8/16/24.
@@ -1369,7 +1369,7 @@ class AI_exta_rrot<bits<8> opcod, string opc, PatFrag opnode>
           IIC_iEXTAr, opc, "\t$Rd, $Rn, $Rm$rot",
           [(set GPRnopc:$Rd, (opnode GPR:$Rn,
                                      (rotr GPRnopc:$Rm, rot_imm:$rot)))]>,
-        Requires<[IsARM, HasV6]> {
+        Requires<[IsARM, HasV6]>, Sched<[WriteALUsr]> {
   bits<4> Rd;
   bits<4> Rm;
   bits<4> Rn;
@@ -1384,7 +1384,7 @@ class AI_exta_rrot<bits<8> opcod, string opc, PatFrag opnode>
 class AI_exta_rrot_np<bits<8> opcod, string opc>
   : AExtI<opcod, (outs GPRnopc:$Rd), (ins GPR:$Rn, GPRnopc:$Rm, rot_imm:$rot),
           IIC_iEXTAr, opc, "\t$Rd, $Rn, $Rm$rot", []>,
-       Requires<[IsARM, HasV6]> {
+       Requires<[IsARM, HasV6]>, Sched<[WriteALUsr]> {
   bits<4> Rn;
   bits<2> rot;
   let Inst{19-16} = Rn;
@@ -1952,7 +1952,8 @@ def TRAP : AXI<(outs), (ins), MiscFrm, NoItinerary,
 let isNotDuplicable = 1 in {
 def PICADD  : ARMPseudoInst<(outs GPR:$dst), (ins GPR:$a, pclabel:$cp, pred:$p),
                             4, IIC_iALUr,
-                            [(set GPR:$dst, (ARMpic_add GPR:$a, imm:$cp))]>;
+                            [(set GPR:$dst, (ARMpic_add GPR:$a, imm:$cp))]>,
+                            Sched<[WriteALU, ReadALU]>;
 
 let AddedComplexity = 10 in {
 def PICLDR  : ARMPseudoInst<(outs GPR:$dst), (ins addrmodepc:$addr, pred:$p),
@@ -2012,11 +2013,11 @@ def ADR : AI1<{0,?,?,0}, (outs GPR:$Rd), (ins adrlabel:$label),
 
 let hasSideEffects = 1 in {
 def LEApcrel : ARMPseudoInst<(outs GPR:$Rd), (ins i32imm:$label, pred:$p),
-                    4, IIC_iALUi, []>;
+                    4, IIC_iALUi, []>, Sched<[WriteALU, ReadALU]>;
 
 def LEApcrelJT : ARMPseudoInst<(outs GPR:$Rd),
                       (ins i32imm:$label, nohash_imm:$id, pred:$p),
-                      4, IIC_iALUi, []>;
+                      4, IIC_iALUi, []>, Sched<[WriteALU, ReadALU]>;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3071,7 +3072,7 @@ defm sysSTM : arm_ldst_mult<"stm", " ^", 0, 1, LdStMulFrm, IIC_iStore_m,
 
 let neverHasSideEffects = 1 in
 def MOVr : AsI1<0b1101, (outs GPR:$Rd), (ins GPR:$Rm), DPFrm, IIC_iMOVr,
-                "mov", "\t$Rd, $Rm", []>, UnaryDP {
+                "mov", "\t$Rd, $Rm", []>, UnaryDP, Sched<[WriteALU]> {
   bits<4> Rd;
   bits<4> Rm;
 
@@ -3085,7 +3086,7 @@ def MOVr : AsI1<0b1101, (outs GPR:$Rd), (ins GPR:$Rm), DPFrm, IIC_iMOVr,
 // A version for the smaller set of tail call registers.
 let neverHasSideEffects = 1 in
 def MOVr_TC : AsI1<0b1101, (outs tcGPR:$Rd), (ins tcGPR:$Rm), DPFrm,
-                IIC_iMOVr, "mov", "\t$Rd, $Rm", []>, UnaryDP {
+                IIC_iMOVr, "mov", "\t$Rd, $Rm", []>, UnaryDP, Sched<[WriteALU]> {
   bits<4> Rd;
   bits<4> Rm;
 
@@ -3098,7 +3099,8 @@ def MOVr_TC : AsI1<0b1101, (outs tcGPR:$Rd), (ins tcGPR:$Rm), DPFrm,
 def MOVsr : AsI1<0b1101, (outs GPRnopc:$Rd), (ins shift_so_reg_reg:$src),
                 DPSoRegRegFrm, IIC_iMOVsr,
                 "mov", "\t$Rd, $src",
-                [(set GPRnopc:$Rd, shift_so_reg_reg:$src)]>, UnaryDP {
+                [(set GPRnopc:$Rd, shift_so_reg_reg:$src)]>, UnaryDP,
+                Sched<[WriteALU]> {
   bits<4> Rd;
   bits<12> src;
   let Inst{15-12} = Rd;
@@ -3114,7 +3116,7 @@ def MOVsr : AsI1<0b1101, (outs GPRnopc:$Rd), (ins shift_so_reg_reg:$src),
 def MOVsi : AsI1<0b1101, (outs GPR:$Rd), (ins shift_so_reg_imm:$src),
                 DPSoRegImmFrm, IIC_iMOVsr,
                 "mov", "\t$Rd, $src", [(set GPR:$Rd, shift_so_reg_imm:$src)]>,
-                UnaryDP {
+                UnaryDP, Sched<[WriteALU]> {
   bits<4> Rd;
   bits<12> src;
   let Inst{15-12} = Rd;
@@ -3127,7 +3129,8 @@ def MOVsi : AsI1<0b1101, (outs GPR:$Rd), (ins shift_so_reg_imm:$src),
 
 let isReMaterializable = 1, isAsCheapAsAMove = 1, isMoveImm = 1 in
 def MOVi : AsI1<0b1101, (outs GPR:$Rd), (ins so_imm:$imm), DPFrm, IIC_iMOVi,
-                "mov", "\t$Rd, $imm", [(set GPR:$Rd, so_imm:$imm)]>, UnaryDP {
+                "mov", "\t$Rd, $imm", [(set GPR:$Rd, so_imm:$imm)]>, UnaryDP,
+                Sched<[WriteALU]> {
   bits<4> Rd;
   bits<12> imm;
   let Inst{25} = 1;
@@ -3141,7 +3144,7 @@ def MOVi16 : AI1<0b1000, (outs GPR:$Rd), (ins imm0_65535_expr:$imm),
                  DPFrm, IIC_iMOVi,
                  "movw", "\t$Rd, $imm",
                  [(set GPR:$Rd, imm0_65535:$imm)]>,
-                 Requires<[IsARM, HasV6T2]>, UnaryDP {
+                 Requires<[IsARM, HasV6T2]>, UnaryDP, Sched<[WriteALU]> {
   bits<4> Rd;
   bits<16> imm;
   let Inst{15-12} = Rd;
@@ -3157,7 +3160,8 @@ def : InstAlias<"mov${p} $Rd, $imm",
         Requires<[IsARM]>;
 
 def MOVi16_ga_pcrel : PseudoInst<(outs GPR:$Rd),
-                                (ins i32imm:$addr, pclabel:$id), IIC_iMOVi, []>;
+                                (ins i32imm:$addr, pclabel:$id), IIC_iMOVi, []>,
+                      Sched<[WriteALU]>;
 
 let Constraints = "$src = $Rd" in {
 def MOVTi16 : AI1<0b1010, (outs GPRnopc:$Rd),
@@ -3167,7 +3171,7 @@ def MOVTi16 : AI1<0b1010, (outs GPRnopc:$Rd),
                   [(set GPRnopc:$Rd,
                         (or (and GPR:$src, 0xffff),
                             lo16AllZero:$imm))]>, UnaryDP,
-                  Requires<[IsARM, HasV6T2]> {
+                  Requires<[IsARM, HasV6T2]>, Sched<[WriteALU]> {
   bits<4> Rd;
   bits<16> imm;
   let Inst{15-12} = Rd;
@@ -3179,7 +3183,8 @@ def MOVTi16 : AI1<0b1010, (outs GPRnopc:$Rd),
 }
 
 def MOVTi16_ga_pcrel : PseudoInst<(outs GPR:$Rd),
-                      (ins GPR:$src, i32imm:$addr, pclabel:$id), IIC_iMOVi, []>;
+                      (ins GPR:$src, i32imm:$addr, pclabel:$id), IIC_iMOVi, []>,
+                      Sched<[WriteALU]>;
 
 } // Constraints
 
@@ -3252,7 +3257,7 @@ def : ARMPat<(or GPR:$src, 0xffff0000), (MOVTi16 GPR:$src, 0xffff)>,
 let Uses = [CPSR] in
 def RRX: PseudoInst<(outs GPR:$Rd), (ins GPR:$Rm), IIC_iMOVsi,
                     [(set GPR:$Rd, (ARMrrx GPR:$Rm))]>, UnaryDP,
-                    Requires<[IsARM]>;
+                    Requires<[IsARM]>, Sched<[WriteALU]>;
 
 // These aren't really mov instructions, but we have to define them this way
 // due to flag operands.
@@ -3260,10 +3265,10 @@ def RRX: PseudoInst<(outs GPR:$Rd), (ins GPR:$Rm), IIC_iMOVsi,
 let Defs = [CPSR] in {
 def MOVsrl_flag : PseudoInst<(outs GPR:$dst), (ins GPR:$src), IIC_iMOVsi,
                       [(set GPR:$dst, (ARMsrl_flag GPR:$src))]>, UnaryDP,
-                      Requires<[IsARM]>;
+                      Sched<[WriteALU]>, Requires<[IsARM]>;
 def MOVsra_flag : PseudoInst<(outs GPR:$dst), (ins GPR:$src), IIC_iMOVsi,
                       [(set GPR:$dst, (ARMsra_flag GPR:$src))]>, UnaryDP,
-                      Requires<[IsARM]>;
+                      Sched<[WriteALU]>, Requires<[IsARM]>;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3429,7 +3434,8 @@ class AAI<bits<8> op27_20, bits<8> op11_4, string opc,
           list<dag> pattern = [],
           dag iops = (ins GPRnopc:$Rn, GPRnopc:$Rm),
           string asm = "\t$Rd, $Rn, $Rm">
-  : AI<(outs GPRnopc:$Rd), iops, DPFrm, IIC_iALUr, opc, asm, pattern> {
+  : AI<(outs GPRnopc:$Rd), iops, DPFrm, IIC_iALUr, opc, asm, pattern>,
+    Sched<[WriteALU, ReadALU, ReadALU]> {
   bits<4> Rn;
   bits<4> Rd;
   bits<4> Rm;
@@ -3505,7 +3511,7 @@ def UHSUB8  : AAI<0b01100111, 0b11111111, "uhsub8">;
 def USAD8  : AI<(outs GPR:$Rd), (ins GPR:$Rn, GPR:$Rm),
                 MulFrm /* for convenience */, NoItinerary, "usad8",
                 "\t$Rd, $Rn, $Rm", []>,
-             Requires<[IsARM, HasV6]> {
+             Requires<[IsARM, HasV6]>, Sched<[WriteALU, ReadALU, ReadALU]> {
   bits<4> Rd;
   bits<4> Rn;
   bits<4> Rm;
@@ -3519,7 +3525,7 @@ def USAD8  : AI<(outs GPR:$Rd), (ins GPR:$Rn, GPR:$Rm),
 def USADA8 : AI<(outs GPR:$Rd), (ins GPR:$Rn, GPR:$Rm, GPR:$Ra),
                 MulFrm /* for convenience */, NoItinerary, "usada8",
                 "\t$Rd, $Rn, $Rm, $Ra", []>,
-             Requires<[IsARM, HasV6]> {
+             Requires<[IsARM, HasV6]>, Sched<[WriteALU, ReadALU, ReadALU]>{
   bits<4> Rd;
   bits<4> Rn;
   bits<4> Rm;
@@ -3652,7 +3658,7 @@ def BFI:I<(outs GPRnopc:$Rd), (ins GPRnopc:$src, GPR:$Rn, bf_inv_mask_imm:$imm),
 
 def  MVNr  : AsI1<0b1111, (outs GPR:$Rd), (ins GPR:$Rm), DPFrm, IIC_iMVNr,
                   "mvn", "\t$Rd, $Rm",
-                  [(set GPR:$Rd, (not GPR:$Rm))]>, UnaryDP {
+                  [(set GPR:$Rd, (not GPR:$Rm))]>, UnaryDP, Sched<[WriteALU]> {
   bits<4> Rd;
   bits<4> Rm;
   let Inst{25} = 0;
@@ -3663,7 +3669,8 @@ def  MVNr  : AsI1<0b1111, (outs GPR:$Rd), (ins GPR:$Rm), DPFrm, IIC_iMVNr,
 }
 def  MVNsi  : AsI1<0b1111, (outs GPR:$Rd), (ins so_reg_imm:$shift),
                   DPSoRegImmFrm, IIC_iMVNsr, "mvn", "\t$Rd, $shift",
-                  [(set GPR:$Rd, (not so_reg_imm:$shift))]>, UnaryDP {
+                  [(set GPR:$Rd, (not so_reg_imm:$shift))]>, UnaryDP,
+                  Sched<[WriteALU]> {
   bits<4> Rd;
   bits<12> shift;
   let Inst{25} = 0;
@@ -3675,7 +3682,8 @@ def  MVNsi  : AsI1<0b1111, (outs GPR:$Rd), (ins so_reg_imm:$shift),
 }
 def  MVNsr  : AsI1<0b1111, (outs GPR:$Rd), (ins so_reg_reg:$shift),
                   DPSoRegRegFrm, IIC_iMVNsr, "mvn", "\t$Rd, $shift",
-                  [(set GPR:$Rd, (not so_reg_reg:$shift))]>, UnaryDP {
+                  [(set GPR:$Rd, (not so_reg_reg:$shift))]>, UnaryDP,
+                  Sched<[WriteALU]> {
   bits<4> Rd;
   bits<12> shift;
   let Inst{25} = 0;
@@ -3690,7 +3698,7 @@ def  MVNsr  : AsI1<0b1111, (outs GPR:$Rd), (ins so_reg_reg:$shift),
 let isReMaterializable = 1, isAsCheapAsAMove = 1, isMoveImm = 1 in
 def  MVNi  : AsI1<0b1111, (outs GPR:$Rd), (ins so_imm:$imm), DPFrm,
                   IIC_iMVNi, "mvn", "\t$Rd, $imm",
-                  [(set GPR:$Rd, so_imm_not:$imm)]>,UnaryDP {
+                  [(set GPR:$Rd, so_imm_not:$imm)]>,UnaryDP, Sched<[WriteALU]> {
   bits<4> Rd;
   bits<12> imm;
   let Inst{25} = 1;
@@ -4201,7 +4209,8 @@ def : ARMPat<(ARMcmpZ GPR:$src, so_reg_reg:$rhs),
 let isCompare = 1, Defs = [CPSR] in {
 def CMNri : AI1<0b1011, (outs), (ins GPR:$Rn, so_imm:$imm), DPFrm, IIC_iCMPi,
                 "cmn", "\t$Rn, $imm",
-                [(ARMcmn GPR:$Rn, so_imm:$imm)]> {
+                [(ARMcmn GPR:$Rn, so_imm:$imm)]>,
+                Sched<[WriteCMP, ReadALU]> {
   bits<4> Rn;
   bits<12> imm;
   let Inst{25} = 1;
@@ -4217,7 +4226,7 @@ def CMNri : AI1<0b1011, (outs), (ins GPR:$Rn, so_imm:$imm), DPFrm, IIC_iCMPi,
 def CMNzrr : AI1<0b1011, (outs), (ins GPR:$Rn, GPR:$Rm), DPFrm, IIC_iCMPr,
                  "cmn", "\t$Rn, $Rm",
                  [(BinOpFrag<(ARMcmpZ node:$LHS,(ineg node:$RHS))>
-                   GPR:$Rn, GPR:$Rm)]> {
+                   GPR:$Rn, GPR:$Rm)]>, Sched<[WriteCMP, ReadALU, ReadALU]> {
   bits<4> Rn;
   bits<4> Rm;
   let isCommutable = 1;
@@ -4235,7 +4244,8 @@ def CMNzrsi : AI1<0b1011, (outs),
                   (ins GPR:$Rn, so_reg_imm:$shift), DPSoRegImmFrm, IIC_iCMPsr,
                   "cmn", "\t$Rn, $shift",
                   [(BinOpFrag<(ARMcmpZ node:$LHS,(ineg node:$RHS))>
-                    GPR:$Rn, so_reg_imm:$shift)]> {
+                    GPR:$Rn, so_reg_imm:$shift)]>,
+                    Sched<[WriteCMPsi, ReadALU]> {
   bits<4> Rn;
   bits<12> shift;
   let Inst{25} = 0;
@@ -4253,7 +4263,8 @@ def CMNzrsr : AI1<0b1011, (outs),
                   (ins GPRnopc:$Rn, so_reg_reg:$shift), DPSoRegRegFrm, IIC_iCMPsr,
                   "cmn", "\t$Rn, $shift",
                   [(BinOpFrag<(ARMcmpZ node:$LHS,(ineg node:$RHS))>
-                    GPRnopc:$Rn, so_reg_reg:$shift)]> {
+                    GPRnopc:$Rn, so_reg_reg:$shift)]>,
+                    Sched<[WriteCMPsr, ReadALU]> {
   bits<4> Rn;
   bits<12> shift;
   let Inst{25} = 0;
@@ -4308,20 +4319,20 @@ let isCommutable = 1, isSelect = 1 in
 def MOVCCr : ARMPseudoInst<(outs GPR:$Rd), (ins GPR:$false, GPR:$Rm, pred:$p),
                            4, IIC_iCMOVr,
   [/*(set GPR:$Rd, (ARMcmov GPR:$false, GPR:$Rm, imm:$cc, CCR:$ccr))*/]>,
-      RegConstraint<"$false = $Rd">;
+      RegConstraint<"$false = $Rd">, Sched<[WriteALU]>;
 
 def MOVCCsi : ARMPseudoInst<(outs GPR:$Rd),
                            (ins GPR:$false, so_reg_imm:$shift, pred:$p),
                            4, IIC_iCMOVsr,
   [/*(set GPR:$Rd, (ARMcmov GPR:$false, so_reg_imm:$shift,
                             imm:$cc, CCR:$ccr))*/]>,
-      RegConstraint<"$false = $Rd">;
+      RegConstraint<"$false = $Rd">, Sched<[WriteALU]>;
 def MOVCCsr : ARMPseudoInst<(outs GPR:$Rd),
                            (ins GPR:$false, so_reg_reg:$shift, pred:$p),
                            4, IIC_iCMOVsr,
   [/*(set GPR:$Rd, (ARMcmov GPR:$false, so_reg_reg:$shift,
                             imm:$cc, CCR:$ccr))*/]>,
-      RegConstraint<"$false = $Rd">;
+      RegConstraint<"$false = $Rd">, Sched<[WriteALU]>;
 
 
 let isMoveImm = 1 in
@@ -4329,14 +4340,15 @@ def MOVCCi16 : ARMPseudoInst<(outs GPR:$Rd),
                              (ins GPR:$false, imm0_65535_expr:$imm, pred:$p),
                              4, IIC_iMOVi,
                              []>,
-      RegConstraint<"$false = $Rd">, Requires<[IsARM, HasV6T2]>;
+      RegConstraint<"$false = $Rd">, Requires<[IsARM, HasV6T2]>,
+      Sched<[WriteALU]>;
 
 let isMoveImm = 1 in
 def MOVCCi : ARMPseudoInst<(outs GPR:$Rd),
                            (ins GPR:$false, so_imm:$imm, pred:$p),
                            4, IIC_iCMOVi,
    [/*(set GPR:$Rd, (ARMcmov GPR:$false, so_imm:$imm, imm:$cc, CCR:$ccr))*/]>,
-      RegConstraint<"$false = $Rd">;
+      RegConstraint<"$false = $Rd">, Sched<[WriteALU]>;
 
 // Two instruction predicate mov immediate.
 let isMoveImm = 1 in
@@ -4349,7 +4361,7 @@ def MVNCCi : ARMPseudoInst<(outs GPR:$Rd),
                            (ins GPR:$false, so_imm:$imm, pred:$p),
                            4, IIC_iCMOVi,
  [/*(set GPR:$Rd, (ARMcmov GPR:$false, so_imm_not:$imm, imm:$cc, CCR:$ccr))*/]>,
-                RegConstraint<"$false = $Rd">;
+                RegConstraint<"$false = $Rd">, Sched<[WriteALU]>;
 
 } // neverHasSideEffects
 
