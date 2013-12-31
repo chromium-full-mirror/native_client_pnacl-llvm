@@ -391,6 +391,11 @@ def : Pat<(v16f32 (X86VBroadcast (loadf32 addr:$src))),
 def : Pat<(v8f64 (X86VBroadcast (loadf64 addr:$src))),
           (VBROADCASTSDZrm addr:$src)>;
 
+def : Pat<(int_x86_avx512_vbroadcast_ss_512 addr:$src),
+          (VBROADCASTSSZrm addr:$src)>;
+def : Pat<(int_x86_avx512_vbroadcast_sd_512 addr:$src),
+          (VBROADCASTSDZrm addr:$src)>;
+
 multiclass avx512_int_broadcast_reg<bits<8> opc, string OpcodeStr,
                           RegisterClass SrcRC, RegisterClass KRC> {
   def Zrr : AVX5128I<opc, MRMSrcReg, (outs VR512:$dst), (ins SrcRC:$src),
@@ -459,6 +464,11 @@ defm VPBROADCASTQZ  : avx512_int_broadcast_rm<0x59, "vpbroadcastq", i64mem,
 def : Pat<(v16f32 (X86VBroadcast (v4f32 VR128X:$src))),
           (VBROADCASTSSZrr VR128X:$src)>;
 def : Pat<(v8f64 (X86VBroadcast (v2f64 VR128X:$src))),
+          (VBROADCASTSDZrr VR128X:$src)>;
+
+def : Pat<(v16f32 (int_x86_avx512_vbroadcast_ss_ps_512 (v4f32 VR128X:$src))),
+          (VBROADCASTSSZrr VR128X:$src)>;
+def : Pat<(v8f64 (int_x86_avx512_vbroadcast_sd_pd_512 (v2f64 VR128X:$src))),
           (VBROADCASTSDZrr VR128X:$src)>;
     
 // Provide fallback in case the load node that is used in the patterns above
