@@ -40,6 +40,11 @@ def tlsreg : Operand<i64> {
   let EncoderMethod = "getTLSRegEncoding";
 }
 def tlsgd : Operand<i64> {}
+def tlscall : Operand<i64> {
+  let PrintMethod = "printTLSCall";
+  let MIOperandInfo = (ops calltarget:$func, tlsgd:$sym);
+  let EncoderMethod = "getTLSCallEncoding";
+}
 
 //===----------------------------------------------------------------------===//
 // 64-bit transformation functions.
@@ -111,6 +116,9 @@ let isCall = 1, PPC970_Unit = 7, Defs = [LR8] in {
     def BL8  : IForm<18, 0, 1, (outs), (ins calltarget:$func),
                      "bl $func", BrB, []>;  // See Pat patterns below.
 
+    def BL8_TLS  : IForm<18, 0, 1, (outs), (ins tlscall:$func),
+                         "bl $func", BrB, []>;
+
     def BLA8 : IForm<18, 1, 1, (outs), (ins abscalltarget:$func),
                      "bla $func", BrB, [(PPCcall (i64 imm:$func))]>;
   }
@@ -119,13 +127,9 @@ let isCall = 1, PPC970_Unit = 7, Defs = [LR8] in {
                              (outs), (ins calltarget:$func),
                              "bl $func\n\tnop", BrB, []>;
 
-    def BL8_NOP_TLSGD : IForm_and_DForm_4_zero<18, 0, 1, 24,
-                                  (outs), (ins calltarget:$func, tlsgd:$sym),
-                                  "bl $func($sym)\n\tnop", BrB, []>;
-
-    def BL8_NOP_TLSLD : IForm_and_DForm_4_zero<18, 0, 1, 24,
-                                  (outs), (ins calltarget:$func, tlsgd:$sym),
-                                  "bl $func($sym)\n\tnop", BrB, []>;
+    def BL8_NOP_TLS : IForm_and_DForm_4_zero<18, 0, 1, 24,
+                                  (outs), (ins tlscall:$func),
+                                  "bl $func\n\tnop", BrB, []>;
 
     def BLA8_NOP : IForm_and_DForm_4_zero<18, 1, 1, 24,
                              (outs), (ins abscalltarget:$func),
