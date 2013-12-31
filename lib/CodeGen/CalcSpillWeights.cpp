@@ -22,20 +22,21 @@
 #include "llvm/Target/TargetRegisterInfo.h"
 using namespace llvm;
 
-void llvm::calculateSpillWeights(LiveIntervals &LIS,
+void llvm::calculateSpillWeightsAndHints(LiveIntervals &LIS,
                            MachineFunction &MF,
                            const MachineLoopInfo &MLI,
-                           const MachineBlockFrequencyInfo &MBFI) {
+                           const MachineBlockFrequencyInfo &MBFI,
+                           VirtRegAuxInfo::NormalizingFn norm) {
   DEBUG(dbgs() << "********** Compute Spill Weights **********\n"
                << "********** Function: " << MF.getName() << '\n');
 
   MachineRegisterInfo &MRI = MF.getRegInfo();
-  VirtRegAuxInfo VRAI(MF, LIS, MLI, MBFI);
+  VirtRegAuxInfo VRAI(MF, LIS, MLI, MBFI, norm);
   for (unsigned i = 0, e = MRI.getNumVirtRegs(); i != e; ++i) {
     unsigned Reg = TargetRegisterInfo::index2VirtReg(i);
     if (MRI.reg_nodbg_empty(Reg))
       continue;
-    VRAI.CalculateWeightAndHint(LIS.getInterval(Reg));
+    VRAI.calculateSpillWeightAndHint(LIS.getInterval(Reg));
   }
 }
 
@@ -92,7 +93,7 @@ static bool isRematerializable(const LiveInterval &LI,
 }
 
 void
-VirtRegAuxInfo::CalculateWeightAndHint(LiveInterval &li) {
+VirtRegAuxInfo::calculateSpillWeightAndHint(LiveInterval &li) {
   MachineRegisterInfo &mri = MF.getRegInfo();
   const TargetRegisterInfo &tri = *MF.getTarget().getRegisterInfo();
   MachineBasicBlock *mbb = 0;
@@ -182,5 +183,5 @@ VirtRegAuxInfo::CalculateWeightAndHint(LiveInterval &li) {
   if (isRematerializable(li, LIS, *MF.getTarget().getInstrInfo()))
     totalWeight *= 0.5F;
 
-  li.weight = normalizeSpillWeight(totalWeight, li.getSize());
+  li.weight = normalize(totalWeight, li.getSize());
 }

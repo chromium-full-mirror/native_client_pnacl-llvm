@@ -43,28 +43,35 @@ namespace llvm {
   /// \brief Calculate auxiliary information for a virtual register such as its
   /// spill weight and allocation hint.
   class VirtRegAuxInfo {
+  public:
+    typedef float (*NormalizingFn)(float, unsigned);
+
+  private:
     MachineFunction &MF;
     LiveIntervals &LIS;
     const MachineLoopInfo &Loops;
     const MachineBlockFrequencyInfo &MBFI;
     DenseMap<unsigned, float> Hint;
+    NormalizingFn normalize;
+
   public:
     VirtRegAuxInfo(MachineFunction &mf, LiveIntervals &lis,
                    const MachineLoopInfo &loops,
-                   const MachineBlockFrequencyInfo &mbfi)
-        : MF(mf), LIS(lis), Loops(loops), MBFI(mbfi) {}
+                   const MachineBlockFrequencyInfo &mbfi,
+                   NormalizingFn norm = normalizeSpillWeight)
+        : MF(mf), LIS(lis), Loops(loops), MBFI(mbfi), normalize(norm) {}
 
     /// \brief (re)compute li's spill weight and allocation hint.
-    void CalculateWeightAndHint(LiveInterval &li);
+    void calculateSpillWeightAndHint(LiveInterval &li);
   };
 
   /// \brief Compute spill weights and allocation hints for all virtual register
   /// live intervals.
-  void calculateSpillWeights(LiveIntervals &LIS,
-                             MachineFunction &MF,
-                             const MachineLoopInfo &MLI,
-                             const MachineBlockFrequencyInfo &MBFI);
-
+  void calculateSpillWeightsAndHints(LiveIntervals &LIS, MachineFunction &MF,
+                                     const MachineLoopInfo &MLI,
+                                     const MachineBlockFrequencyInfo &MBFI,
+                                     VirtRegAuxInfo::NormalizingFn norm =
+                                         normalizeSpillWeight);
 }
 
 #endif // LLVM_CODEGEN_CALCSPILLWEIGHTS_H
