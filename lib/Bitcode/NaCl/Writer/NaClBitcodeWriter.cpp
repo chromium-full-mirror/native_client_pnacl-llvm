@@ -695,38 +695,12 @@ static bool WriteInstruction(const Instruction &I, unsigned InstID,
       Vals64.push_back(SI.getNumCases());
       for (SwitchInst::ConstCaseIt i = SI.case_begin(), e = SI.case_end();
            i != e; ++i) {
-        const IntegersSubset& CaseRanges = i.getCaseValueEx();
-        unsigned Code, Abbrev; // will unused.
+        // const IntegersSubset& CaseRanges = i.getCaseValueEx();
+        // assert(CaseRanges.isSingleNumber());
 
-        if (CaseRanges.isSingleNumber()) {
-          Vals64.push_back(1/*NumItems = 1*/);
-          Vals64.push_back(true/*IsSingleNumber = true*/);
-          EmitAPInt(Vals64, Code, Abbrev, CaseRanges.getSingleNumber(0));
-        } else {
-
-          Vals64.push_back(CaseRanges.getNumItems());
-
-          if (CaseRanges.isSingleNumbersOnly()) {
-            for (unsigned ri = 0, rn = CaseRanges.getNumItems();
-                 ri != rn; ++ri) {
-
-              Vals64.push_back(true/*IsSingleNumber = true*/);
-
-              EmitAPInt(Vals64, Code, Abbrev, CaseRanges.getSingleNumber(ri));
-            }
-          } else
-            for (unsigned ri = 0, rn = CaseRanges.getNumItems();
-                 ri != rn; ++ri) {
-              IntegersSubset::Range r = CaseRanges.getItem(ri);
-              bool IsSingleNumber = CaseRanges.isSingleNumber(ri);
-
-              Vals64.push_back(IsSingleNumber);
-
-              EmitAPInt(Vals64, Code, Abbrev, r.getLow());
-              if (!IsSingleNumber)
-                EmitAPInt(Vals64, Code, Abbrev, r.getHigh());
-            }
-        }
+        Vals64.push_back(1/*NumItems = 1*/);
+        Vals64.push_back(true/*IsSingleNumber = true*/);
+        emitSignedInt64(Vals64, i.getCaseValue()->getSExtValue());
         Vals64.push_back(VE.getValueID(i.getCaseSuccessor()));
       }
 
