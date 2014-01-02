@@ -194,7 +194,7 @@ static tool_output_file *GetOutputStream(const char *TargetName,
   // Open the file.
   std::string error;
   unsigned OpenFlags = 0;
-  if (Binary) OpenFlags |= raw_fd_ostream::F_Binary;
+  if (Binary) OpenFlags |= sys::fs::F_Binary;
   OwningPtr<tool_output_file> FDOut(
       new tool_output_file(OutputFilename.c_str(), error, OpenFlags));
   if (!error.empty()) {
