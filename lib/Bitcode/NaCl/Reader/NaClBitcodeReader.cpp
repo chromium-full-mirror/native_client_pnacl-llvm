@@ -1231,36 +1231,37 @@ bool NaClBitcodeReader::ParseFunctionBody(Function *F) {
 
       unsigned CurIdx = 4;
       for (unsigned i = 0; i != NumCases; ++i) {
-        IntegersSubsetToBB CaseBuilder;
+        // IntegersSubsetToBB CaseBuilder;
         unsigned NumItems = Record[CurIdx++];
-        for (unsigned ci = 0; ci != NumItems; ++ci) {
-          bool isSingleNumber = Record[CurIdx++];
+        assert(NumItems == 1);
+        // for (unsigned ci = 0; ci != NumItems; ++ci) {
+        bool isSingleNumber = Record[CurIdx++];
+        assert(isSingleNumber);
 
-          APInt Low;
-          unsigned ActiveWords = 1;
-          if (ValueBitWidth > 64)
-            ActiveWords = Record[CurIdx++];
-          Low = ReadWideAPInt(makeArrayRef(&Record[CurIdx], ActiveWords),
-                              ValueBitWidth);
-          CurIdx += ActiveWords;
+        APInt Low;
+        unsigned ActiveWords = 1;
+        if (ValueBitWidth > 64)
+          ActiveWords = Record[CurIdx++];
+        Low = ReadWideAPInt(makeArrayRef(&Record[CurIdx], ActiveWords),
+                            ValueBitWidth);
+        CurIdx += ActiveWords;
 
-          if (!isSingleNumber) {
-            ActiveWords = 1;
-            if (ValueBitWidth > 64)
-              ActiveWords = Record[CurIdx++];
-            APInt High =
-                ReadWideAPInt(makeArrayRef(&Record[CurIdx], ActiveWords),
-                              ValueBitWidth);
+          // if (!isSingleNumber) {
+          //   ActiveWords = 1;
+          //   if (ValueBitWidth > 64)
+          //     ActiveWords = Record[CurIdx++];
+          //   APInt High =
+          //       ReadWideAPInt(makeArrayRef(&Record[CurIdx], ActiveWords),
+          //                     ValueBitWidth);
 
-            CaseBuilder.add(IntItem::fromType(OpTy, Low),
-                            IntItem::fromType(OpTy, High));
-            CurIdx += ActiveWords;
-          } else
-            CaseBuilder.add(IntItem::fromType(OpTy, Low));
-        }
+          //   CaseBuilder.add(IntItem::fromType(OpTy, Low),
+          //                   IntItem::fromType(OpTy, High));
+          //   CurIdx += ActiveWords;
+          // } else
+          //   CaseBuilder.add(IntItem::fromType(OpTy, Low));
         BasicBlock *DestBB = getBasicBlock(Record[CurIdx++]);
-        IntegersSubset Case = CaseBuilder.getCase();
-        SI->addCase(Case, DestBB);
+        // IntegersSubset Case = CaseBuilder.getCase();
+        SI->addCase(ConstantInt::get(Context, Low), DestBB);
       }
       I = SI;
       break;
