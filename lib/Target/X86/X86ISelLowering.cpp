@@ -11151,7 +11151,6 @@ static SDValue getTargetVShiftByConstNode(unsigned Opc, SDLoc dl, EVT VT,
 }
 
 // getTargetVShiftNode - Handle vector element shifts where the shift amount
->>>>>>> 1d82537762a0f4019bde301d498d190140585f57
 // may or may not be a constant. Takes immediate version of shift as input.
 static SDValue getTargetVShiftNode(unsigned Opc, SDLoc dl, EVT VT,
                                    SDValue SrcOp, SDValue ShAmt,
