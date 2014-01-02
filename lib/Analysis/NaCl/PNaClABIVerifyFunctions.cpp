@@ -464,18 +464,18 @@ const char *PNaClABIVerifyFunctions::checkInstruction(const Instruction *Inst) {
       // SwitchInst requires the cases to be ConstantInts, but it
       // doesn't require their types to be the same as the condition
       // value, so check all the cases too.
-      for (SwitchInst::ConstCaseIt Case = Switch->case_begin(),
-             E = Switch->case_end(); Case != E; ++Case) {
-        IntegersSubset CaseRanges = Case.getCaseValueEx();
-        for (unsigned I = 0, E = CaseRanges.getNumItems(); I < E ; ++I) {
-          if (!isValidScalarOperand(
-                  CaseRanges.getItem(I).getLow().toConstantInt()) ||
-              !isValidScalarOperand(
-                  CaseRanges.getItem(I).getHigh().toConstantInt())) {
-            return "bad switch case";
-          }
-        }
-      }
+      // for (SwitchInst::ConstCaseIt Case = Switch->case_begin(),
+      //        E = Switch->case_end(); Case != E; ++Case) {
+      //   IntegersSubset CaseRanges = Case.getCaseValueEx();
+      //   for (unsigned I = 0, E = CaseRanges.getNumItems(); I < E ; ++I) {
+      //     if (!isValidScalarOperand(
+      //             CaseRanges.getItem(I).getLow().toConstantInt()) ||
+      //         !isValidScalarOperand(
+      //             CaseRanges.getItem(I).getHigh().toConstantInt())) {
+      //       return "bad switch case";
+      //     }
+      //   }
+      // }
 
       // Allow the instruction and skip the later checks.
       return NULL;
