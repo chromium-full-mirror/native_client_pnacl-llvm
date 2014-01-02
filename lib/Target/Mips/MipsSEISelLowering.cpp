@@ -1395,7 +1395,7 @@ SDValue MipsSETargetLowering::lowerINTRINSIC_WO_CHAIN(SDValue Op,
     return SDValue();
   // @LOCALMOD-BEGIN
   case Intrinsic::nacl_read_tp:
-    return GetNaClThreadPointer(DAG, Op->getDebugLoc());
+    return GetNaClThreadPointer(DAG, SDLoc(Op));
   // @LOCALMOD-END
   case Intrinsic::mips_shilo:
     return lowerDSPIntr(Op, DAG, MipsISD::SHILO);

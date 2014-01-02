@@ -1423,7 +1423,7 @@ bool X86DAGToDAGISel::SelectAddr(SDNode *Parent, SDValue N, SDValue &Base,
     assert(Base.getValueType() == MVT::i64 && "Unexpected base operand size");
 
     if (Index.getValueType() != MVT::i64) {
-      Index = CurDAG->getZExtOrTrunc(Index, Index.getDebugLoc(), MVT::i64);
+      Index = CurDAG->getZExtOrTrunc(Index, SDLoc(Index), MVT::i64);
       // Insert the new node into the topological ordering.
       if (Parent &&
           (Index->getNodeId() == -1 ||
@@ -1708,7 +1708,7 @@ void X86DAGToDAGISel::LegalizeAddressingModeForNaCl(SDValue N,
   if (AM.isRIPRelative())
     return;
 
-  DebugLoc dl = N->getDebugLoc();
+  SDLoc dl(N);
   // Case 1 above:
   if (!AM.hasBaseOrIndexReg() && !AM.hasSymbolicDisplacement() && AM.Disp < 0) {
     SDValue Imm = CurDAG->getTargetConstant(AM.Disp, MVT::i32);

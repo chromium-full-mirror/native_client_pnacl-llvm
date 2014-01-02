@@ -430,7 +430,7 @@ namespace llvm {
     bool HasMips64, IsN64, IsO32;
 
     // @LOCALMOD-BEGIN
-    SDValue GetNaClThreadPointer(SelectionDAG &DAG, DebugLoc DL) const;
+    SDValue GetNaClThreadPointer(SelectionDAG &DAG, SDLoc DL) const;
     // @LOCALMOD-END
 
   private:
