@@ -317,8 +317,9 @@ static unsigned getEncodedLinkage(const GlobalValue *GV) {
   switch (GV->getLinkage()) {
   case GlobalValue::ExternalLinkage:                 return 0;
   case GlobalValue::InternalLinkage:                 return 3;
+  default:
+    report_fatal_error("Invalid linkage");
   }
-  report_fatal_error("Invalid linkage");
 }
 
 /// \brief Function to convert constant initializers for global
