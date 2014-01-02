@@ -797,6 +797,7 @@ AddrMode2Type ARMDAGToDAGISel::SelectAddrMode2Worker(SDNode *Op,
   }
   
   // @LOCALMOD-START
+#if 0
   // Keep load and store addressing modes simple
   if (restrict_addressing_modes_for_nacl) {
     Base = N;
@@ -812,6 +813,7 @@ AddrMode2Type ARMDAGToDAGISel::SelectAddrMode2Worker(SDNode *Op,
                                     MVT::i32);
     return AM2_BASE;
   }
+#endif
   // @LOCALMOD-END
 
   // Otherwise this is R +/- [possibly shifted] R.

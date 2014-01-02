@@ -1517,13 +1517,13 @@ SDValue MipsTargetLowering::LowerNaClTpTlsOffset(SDValue Op,
   return DAG.getConstant(0, Op.getValueType().getSimpleVT());
 }
 
-SDValue MipsTargetLowering::LowerNaClTpTdbOffset(SDValue Op,
-                                                 SelectionDAG &DAG) const {
-  DebugLoc dl = Op.getDebugLoc();
-  return DAG.getNode(ISD::SUB, dl, Op.getValueType().getSimpleVT(),
-                     DAG.getConstant(0, Op.getValueType().getSimpleVT()),
-		     Op.getOperand(0));
-}
+// SDValue MipsTargetLowering::LowerNaClTpTdbOffset(SDValue Op,
+//                                                  SelectionDAG &DAG) const {
+//   DebugLoc dl = Op.getDebugLoc();
+//   return DAG.getNode(ISD::SUB, dl, Op.getValueType().getSimpleVT(),
+//                      DAG.getConstant(0, Op.getValueType().getSimpleVT()),
+// 		     Op.getOperand(0));
+// }
 
 SDValue
 MipsTargetLowering::LowerNaClTargetArch(SDValue Op, SelectionDAG &DAG) const {
@@ -1535,7 +1535,7 @@ MipsTargetLowering::LowerNaClTargetArch(SDValue Op, SelectionDAG &DAG) const {
 }
 
 SDValue MipsTargetLowering::
-GetNaClThreadPointer(SelectionDAG &DAG, DebugLoc DL) const {
+GetNaClThreadPointer(SelectionDAG &DAG, SDLoc DL) const {
   EVT PtrVT = getPointerTy();
   SDValue ThreadPointer;
   if (llvm::TLSUseCall) {

@@ -165,12 +165,14 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
   int D8SpillFI = 0;
 
   // @LOCALMOD-START
+#if 0
   MachineModuleInfo &MMI = MF.getMMI();
   // This condition was gleaned from x86 / PowerPC / XCore
   bool needsFrameMoves = STI.isTargetNaCl() &&
                          (MMI.hasDebugInfo() ||
                           !MF.getFunction()->doesNotThrow() ||
                           MF.getFunction()->needsUnwindTableEntry());
+#endif
   // @LOCALMOD-END
   
   // All calls are tail calls in GHC calling conv, and functions have no
@@ -234,6 +236,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
     FramePtrPush = LastPush = MBBI++;
 
   // @LOCALMOD-START
+#if 0
   unsigned TotalCfaAdjust = GPRCS1Size;
   if (needsFrameMoves && GPRCS1Size > 0) {
     // we just skipped the initial callee save reg instructions, e.g.
@@ -268,6 +271,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
       }
     }
   }
+#endif
   // @LOCALMOD-END
 
   // Determine starting offsets of spill areas.
@@ -286,6 +290,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
   AFI->setDPRCalleeSavedAreaOffset(DPRCSOffset);
 
   // @LOCALMOD-START
+#if 0
   if (HasFP && needsFrameMoves) {
     // we just emitted the fp pointer setup instruction, e.g.
     // add      r11, sp, #8
@@ -303,6 +308,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
     MachineLocation src(FramePtr, 8);
     MMI.getFrameMoves().push_back(MachineMove(AfterFramePointerInit, dst, src));
   }
+#endif
   // @LOCALMOD-END
 
   // Move past area 2.
@@ -319,6 +325,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
       LastPush = MBBI++;
 
     // @LOCALMOD-BEGIN
+#if 0
     if(needsFrameMoves) {
       MCSymbol *AfterRegSave = MMI.getContext().CreateTempSymbol();
       BuildMI(MBB, MBBI, dl, TII.get(ARM::PROLOG_LABEL)).addSym(AfterRegSave);
@@ -351,6 +358,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
         }
       }
     }
+#endif
     // @LOCALMOD-END
   }
 
@@ -385,6 +393,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
       AFI->setShouldRestoreSPFromFP(true);
 
     // @LOCALMOD-START
+#if 0
     // CFA offset needs to be updated if it is relative to the SP (which as
     // just moved). Otherwise it is relative to FP, which has not changed.
     if (needsFrameMoves && !HasFP) {
@@ -396,6 +405,7 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
       MachineLocation src(MachineLocation::VirtualFP, -TotalCfaAdjust);
       MMI.getFrameMoves().push_back(MachineMove(AfterStackUpdate, dst, src));
     }
+#endif
     // @LOCALMOD-END
   }
 

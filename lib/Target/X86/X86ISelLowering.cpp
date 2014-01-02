@@ -11093,6 +11093,7 @@ static SDValue LowerVACOPY(SDValue Op, const X86Subtarget *Subtarget,
                        MachinePointerInfo(DstSV), MachinePointerInfo(SrcSV));
 }
 
+#if 0
 //////////////////////////////////////////////////////////////////////
 // NaCl TLS setup / layout intrinsics.
 // See: native_client/src/untrusted/stubs/tls_params.h
@@ -11127,6 +11128,7 @@ X86TargetLowering::LowerNaClTargetArch(SDValue Op, SelectionDAG &DAG) const {
                           PnaclTargetArchitectureX86_32),
                          Op.getValueType().getSimpleVT());
 }
+#endif
 
 //////////////////////////////////////////////////////////////////////
 

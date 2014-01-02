@@ -220,6 +220,7 @@ static MCAsmInfo *createARMMCAsmInfo(const MCRegisterInfo &MRI, StringRef TT) {
     return new ARMMCAsmInfoDarwin();
 
   // @LOCALMOD-BEGIN
+#if 0
   ARMELFMCAsmInfo *MAI = new ARMELFMCAsmInfo();
   if (TheTriple.isOSNaCl()) {
     // NativeClient uses Dwarf exception handling
@@ -230,6 +231,7 @@ static MCAsmInfo *createARMMCAsmInfo(const MCRegisterInfo &MRI, StringRef TT) {
     MAI->addInitialFrameState(0, Dst, Src);
   }
   return MAI;
+#endif
   // @LOCALMOD-END
 }
 

@@ -2426,6 +2426,7 @@ SDValue ARMTargetLowering::LowerBlockAddress(SDValue Op,
 }
 
 // @LOCALMOD-START
+#if 0
 // more conventional jumptable implementation
 SDValue ARMTargetLowering::LowerJumpTable(SDValue Op, SelectionDAG &DAG) const {
   assert(!Subtarget->useInlineJumpTables() &&
@@ -2470,6 +2471,7 @@ ARMTargetLowering::LowerNaClTargetArch(SDValue Op, SelectionDAG &DAG) const {
 
 //////////////////////////////////////////////////////////////////////
 
+#endif
 // @LOCALMOD-END
 
 // Lower ISD::GlobalTLSAddress using the "general dynamic" model
@@ -5982,7 +5984,7 @@ SDValue ARMTargetLowering::LowerEH_RETURN(SDValue Op, SelectionDAG &DAG)
   SDValue Chain     = Op.getOperand(0);
   SDValue Offset    = Op.getOperand(1);
   SDValue Handler   = Op.getOperand(2);
-  DebugLoc dl       = Op.getDebugLoc();
+  SDLoc dl(Op);
 
   // Store stack offset in R2, jump target in R3, dummy return value in R0
   // The dummy return value is needed to make the use-def chains happy,
