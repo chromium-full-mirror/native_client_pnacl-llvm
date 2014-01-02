@@ -837,29 +837,29 @@ class TrapBase<Instruction RealInst>
 
 // Older Macro based SFI Model
 def SFI_GUARD_LOADSTORE :
-MipsAsmPseudoInst<(outs CPURegs:$dst), (ins CPURegs:$src1, CPURegs:$src2),
+MipsAsmPseudoInst<(outs GPR32:$dst), (ins GPR32:$src1, GPR32:$src2),
     "sfi_load_store_preamble\t$dst, $src1, $src2">;
 
 def SFI_GUARD_INDIRECT_CALL :
-MipsAsmPseudoInst<(outs CPURegs:$dst), (ins CPURegs:$src1, CPURegs:$src2),
+MipsAsmPseudoInst<(outs GPR32:$dst), (ins GPR32:$src1, GPR32:$src2),
     "sfi_indirect_call_preamble\t$dst, $src1, $src2">;
 
 def SFI_GUARD_INDIRECT_JMP :
-MipsAsmPseudoInst<(outs CPURegs:$dst), (ins CPURegs:$src1, CPURegs:$src2),
+MipsAsmPseudoInst<(outs GPR32:$dst), (ins GPR32:$src1, GPR32:$src2),
     "sfi_indirect_jump_preamble\t$dst, $src1, $src2">;
 
 def SFI_GUARD_CALL :
 MipsAsmPseudoInst<(outs), (ins), "sfi_call_preamble">;
 
 def SFI_GUARD_RETURN :
-MipsAsmPseudoInst<(outs CPURegs:$dst), (ins CPURegs:$src1, CPURegs:$src2),
+MipsAsmPseudoInst<(outs GPR32:$dst), (ins GPR32:$src1, GPR32:$src2),
     "sfi_return_preamble\t$dst, $src1, $src2">;
 
 def SFI_NOP_IF_AT_BUNDLE_END :
 MipsAsmPseudoInst<(outs), (ins), "sfi_nop_if_at_bundle_end">;
 
 def SFI_DATA_MASK :
-MipsAsmPseudoInst<(outs CPURegs:$dst), (ins CPURegs:$src1, CPURegs:$src2),
+MipsAsmPseudoInst<(outs GPR32:$dst), (ins GPR32:$src1, GPR32:$src2),
     "sfi_data_mask\t$dst, $src1, $src2">;
 
 // @LOCALMOD-END
