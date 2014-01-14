@@ -220,7 +220,6 @@ static MCAsmInfo *createARMMCAsmInfo(const MCRegisterInfo &MRI, StringRef TT) {
     return new ARMMCAsmInfoDarwin();
 
   // @LOCALMOD-BEGIN
-#if 0
   ARMELFMCAsmInfo *MAI = new ARMELFMCAsmInfo();
   if (TheTriple.isOSNaCl()) {
     // NativeClient uses Dwarf exception handling
@@ -228,10 +227,10 @@ static MCAsmInfo *createARMMCAsmInfo(const MCRegisterInfo &MRI, StringRef TT) {
     // Initial state of the frame ARM:SP points to cfa
     MachineLocation Dst(MachineLocation::VirtualFP);
     MachineLocation Src(ARM::SP, 0);
-    MAI->addInitialFrameState(0, Dst, Src);
+    // @LOCALMOD-DISABLED
+    // MAI->addInitialFrameState(0, Dst, Src);
   }
   return MAI;
-#endif
   // @LOCALMOD-END
 }
 
