@@ -2418,18 +2418,16 @@ SDValue ARMTargetLowering::LowerBlockAddress(SDValue Op,
 }
 
 // @LOCALMOD-START
-#if 0
 // more conventional jumptable implementation
 SDValue ARMTargetLowering::LowerJumpTable(SDValue Op, SelectionDAG &DAG) const {
   assert(!Subtarget->useInlineJumpTables() &&
          "inline jump tables not custom lowered");
-  const DebugLoc dl = Op.getDebugLoc();
+  const SDLoc dl(Op);
   EVT PTy = getPointerTy();
   JumpTableSDNode *JT = cast<JumpTableSDNode>(Op);
   SDValue JTI = DAG.getTargetJumpTable(JT->getIndex(), PTy);
   return DAG.getNode(ARMISD::WrapperJT2, dl, MVT::i32, JTI);
 }
-#endif
 // @LOCALMOD-END
 
 // Lower ISD::GlobalTLSAddress using the "general dynamic" model
