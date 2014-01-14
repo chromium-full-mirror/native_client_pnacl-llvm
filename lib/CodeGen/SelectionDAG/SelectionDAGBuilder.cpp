@@ -5336,28 +5336,6 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
     visitPatchpoint(I);
     return 0;
   }
-  // @LOCALMOD-BEGIN
-  // Native Client Intrinsics for TLS setup / layout.
-  case Intrinsic::nacl_tp_tls_offset: {
-    SDValue tls_size = getValue(I.getArgOperand(0));
-    setValue(&I, DAG.getNode(ISD::NACL_TP_TLS_OFFSET, sdl,
-                             tls_size.getValueType(),
-                             tls_size));
-    return 0;
-  }
-  case Intrinsic::nacl_tp_tdb_offset: {
-    SDValue tdb_size = getValue(I.getArgOperand(0));
-    setValue(&I, DAG.getNode(ISD::NACL_TP_TDB_OFFSET, sdl,
-                             tdb_size.getValueType(),
-                             tdb_size));
-    return 0;
-  }
-  case Intrinsic::nacl_target_arch: {
-    EVT DestVT = TLI->getValueType(I.getType());
-    setValue(&I, DAG.getNode(ISD::NACL_TARGET_ARCH, sdl, DestVT));
-    return 0;
-  }
-  // @LOCALMOD-END
   }
 }
 
