@@ -193,8 +193,9 @@ static tool_output_file *GetOutputStream(const char *TargetName,
 
   // Open the file.
   std::string error;
-  unsigned OpenFlags = 0;
-  if (Binary) OpenFlags |= sys::fs::F_Binary;
+  sys::fs::OpenFlags OpenFlags = sys::fs::F_None;
+  if (Binary)
+    OpenFlags |= sys::fs::F_Binary;
   OwningPtr<tool_output_file> FDOut(
       new tool_output_file(OutputFilename.c_str(), error, OpenFlags));
   if (!error.empty()) {
@@ -375,12 +376,10 @@ static int compileModule(StringRef ProgramName, LLVMContext &Context) {
   Options.GuaranteedTailCallOpt = EnableGuaranteedTailCallOpt;
   Options.DisableTailCalls = DisableTailCalls;
   Options.StackAlignmentOverride = OverrideStackAlignment;
-  Options.RealignStack = EnableRealignStack;
   Options.TrapFuncName = TrapFuncName;
   Options.PositionIndependentExecutable = EnablePIE;
   Options.EnableSegmentedStacks = SegmentedStacks;
   Options.UseInitArray = UseInitArray;
-  Options.SSPBufferSize = SSPBufferSize;
 
   std::auto_ptr<TargetMachine>
     target(TheTarget->createTargetMachine(TheTriple.getTriple(),
