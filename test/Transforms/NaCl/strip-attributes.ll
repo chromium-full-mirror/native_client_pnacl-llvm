@@ -6,7 +6,7 @@
 
 
 define fastcc void @func_attrs(i32 inreg, i32 zeroext)
-    unnamed_addr noreturn nounwind readonly align 8 {
+    unnamed_addr alwaysinline cold noreturn nounwind readonly align 8 {
   ret void
 }
 ; CHECK: define void @func_attrs(i32, i32) {
