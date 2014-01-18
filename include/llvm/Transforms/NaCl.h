@@ -18,7 +18,7 @@ class FunctionPass;
 class FunctionType;
 class Instruction;
 class ModulePass;
-class PassManager;
+class PassManagerBase;
 class Use;
 class Value;
 
@@ -51,8 +51,8 @@ ModulePass *createRewritePNaClLibraryCallsPass();
 ModulePass *createStripAttributesPass();
 ModulePass *createStripMetadataPass();
 
-void PNaClABISimplifyAddPreOptPasses(PassManager &PM);
-void PNaClABISimplifyAddPostOptPasses(PassManager &PM);
+void PNaClABISimplifyAddPreOptPasses(PassManagerBase &PM);
+void PNaClABISimplifyAddPostOptPasses(PassManagerBase &PM);
 
 Instruction *PhiSafeInsertPt(Use *U);
 void PhiSafeReplaceUses(Use *U, Value *NewVal);
