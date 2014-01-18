@@ -282,6 +282,8 @@ std::string getMainExecutable(const char *argv0, void *MainAddr) {
   char link_path[MAXPATHLEN];
   if (realpath(DLInfo.dli_fname, link_path))
     return link_path;
+#elif defined(__native_client__)
+  // Nothing.
 #else
 #error GetMainExecutable is not implemented on this host yet.
 #endif
@@ -536,6 +538,8 @@ error_code setLastModificationAndAccessTime(int FD, TimeValue Time) {
   Times[0].tv_usec = 0;
   Times[1] = Times[0];
   if (::futimes(FD, Times))
+#elif defined(__native_client__)
+  if (true)
 #else
 #error Missing futimes() and futimens()
 #endif
