@@ -96,6 +96,8 @@ static void CheckAttributes(AttributeSet Attrs) {
         case Attribute::ReadNone:
         case Attribute::ReadOnly:
 
+        case Attribute::Builtin:
+
         // PNaCl does not support -fstack-protector in the translator.
         case Attribute::StackProtect:
         case Attribute::StackProtectReq:
