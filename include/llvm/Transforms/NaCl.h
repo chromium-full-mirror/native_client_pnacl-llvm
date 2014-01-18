@@ -10,6 +10,8 @@
 #ifndef LLVM_TRANSFORMS_NACL_H
 #define LLVM_TRANSFORMS_NACL_H
 
+#include "llvm/CodeGen/Passes.h"
+
 namespace llvm {
 
 class BasicBlockPass;
@@ -18,7 +20,6 @@ class FunctionPass;
 class FunctionType;
 class Instruction;
 class ModulePass;
-class PassManagerBase;
 class Use;
 class Value;
 
