@@ -382,7 +382,19 @@ static void DisassembleObject(const ObjectFile *Obj, bool InlineRelocs) {
   }
 
 
+  // Create a mapping, S2 = SectionRelocMap[S1], where section S2
+  // contains the relocations for section S1.
   error_code ec;
+  std::map<SectionRef, SectionRef> SectionRelocMap;
+  for (section_iterator i = Obj->begin_sections(),
+                        e = Obj->end_sections();
+                        i != e; i.increment(ec)) {
+    if (error(ec)) break;
+    section_iterator Sec2 = i->getRelocatedSection();
+    if (Sec2 != Obj->end_sections())
+      SectionRelocMap.insert(std::pair<SectionRef, SectionRef>(*Sec2, *i));
+  }
+
   for (section_iterator i = Obj->begin_sections(),
                         e = Obj->end_sections();
                         i != e; i.increment(ec)) {
@@ -418,8 +430,9 @@ static void DisassembleObject(const ObjectFile *Obj, bool InlineRelocs) {
     // Make a list of all the relocations for this section.
     std::vector<RelocationRef> Rels;
     if (InlineRelocs) {
-      for (relocation_iterator ri = i->begin_relocations(),
-                               re = i->end_relocations();
+      SectionRef RelocSec = SectionRelocMap[*i];
+      for (relocation_iterator ri = RelocSec.begin_relocations(),
+                               re = RelocSec.end_relocations();
                                ri != re; ri.increment(ec)) {
         if (error(ec)) break;
         Rels.push_back(*ri);
