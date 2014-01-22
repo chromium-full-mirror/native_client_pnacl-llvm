@@ -225,10 +225,8 @@ static MCAsmInfo *createARMMCAsmInfo(const MCRegisterInfo &MRI, StringRef TT) {
     // NativeClient uses Dwarf exception handling
     MAI->setExceptionsType(ExceptionHandling::DwarfCFI);
     // Initial state of the frame ARM:SP points to cfa
-    MachineLocation Dst(MachineLocation::VirtualFP);
-    MachineLocation Src(ARM::SP, 0);
-    // @LOCALMOD-DISABLED
-    // MAI->addInitialFrameState(0, Dst, Src);
+    unsigned Reg = MRI.getDwarfRegNum(ARM::SP, true);
+    MAI->addInitialFrameState(MCCFIInstruction::createDefCfa(0, Reg, 0));
   }
   return MAI;
   // @LOCALMOD-END
