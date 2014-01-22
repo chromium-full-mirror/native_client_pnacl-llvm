@@ -165,14 +165,12 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
   int D8SpillFI = 0;
 
   // @LOCALMOD-START
-#if 0
   MachineModuleInfo &MMI = MF.getMMI();
   // This condition was gleaned from x86 / PowerPC / XCore
   bool needsFrameMoves = STI.isTargetNaCl() &&
                          (MMI.hasDebugInfo() ||
                           !MF.getFunction()->doesNotThrow() ||
                           MF.getFunction()->needsUnwindTableEntry());
-#endif
   // @LOCALMOD-END
   
   // All calls are tail calls in GHC calling conv, and functions have no
@@ -236,7 +234,6 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
     FramePtrPush = LastPush = MBBI++;
 
   // @LOCALMOD-START
-#if 0
   unsigned TotalCfaAdjust = GPRCS1Size;
   if (needsFrameMoves && GPRCS1Size > 0) {
     // we just skipped the initial callee save reg instructions, e.g.
@@ -246,9 +243,8 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
     MCSymbol *AfterRegSave = MMI.getContext().CreateTempSymbol();
     BuildMI(MBB, MBBI, dl, TII.get(ARM::PROLOG_LABEL)).addSym(AfterRegSave);
     // record the fact that the stack has moved
-    MachineLocation dst(MachineLocation::VirtualFP);
-    MachineLocation src(MachineLocation::VirtualFP, -TotalCfaAdjust);
-    MMI.getFrameMoves().push_back(MachineMove(AfterRegSave, dst, src));
+    MMI.addFrameInst(MCCFIInstruction::createDefCfaOffset(
+                         AfterRegSave, -TotalCfaAdjust));
     // for each callee saved register record where it has been saved
     int offset = 0;
     for (unsigned i = 0, e = CSI.size(); i != e; ++i) {
@@ -264,14 +260,13 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
        case ARM::R11:
        case ARM::LR:
         offset -= 4;
-        MachineLocation dst(MachineLocation::VirtualFP, offset);
-        MachineLocation src(Reg);
-        MMI.getFrameMoves().push_back(MachineMove(AfterRegSave, dst, src));
+        unsigned DwarfReg = RegInfo->getDwarfRegNum(Reg, true);
+        MMI.addFrameInst(MCCFIInstruction::createOffset(
+                             AfterRegSave, DwarfReg, offset));
         break;
       }
     }
   }
-#endif
   // @LOCALMOD-END
 
   // Determine starting offsets of spill areas.
@@ -290,7 +285,6 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
   AFI->setDPRCalleeSavedAreaOffset(DPRCSOffset);
 
   // @LOCALMOD-START
-#if 0
   if (HasFP && needsFrameMoves) {
     // we just emitted the fp pointer setup instruction, e.g.
     // add      r11, sp, #8
@@ -304,11 +298,10 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
     // This should be fine as long as we are consistent.
     // NOTE: this is related to the offset computed for
     // ISD::FRAME_TO_ARGS_OFFSET
-    MachineLocation dst(MachineLocation::VirtualFP);
-    MachineLocation src(FramePtr, 8);
-    MMI.getFrameMoves().push_back(MachineMove(AfterFramePointerInit, dst, src));
+    unsigned DwarfFramePtr = RegInfo->getDwarfRegNum(FramePtr, true);
+    MMI.addFrameInst(MCCFIInstruction::createDefCfa(
+                         AfterFramePointerInit, DwarfFramePtr, -8));
   }
-#endif
   // @LOCALMOD-END
 
   // Move past area 2.
@@ -325,7 +318,6 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
       LastPush = MBBI++;
 
     // @LOCALMOD-BEGIN
-#if 0
     if(needsFrameMoves) {
       MCSymbol *AfterRegSave = MMI.getContext().CreateTempSymbol();
       BuildMI(MBB, MBBI, dl, TII.get(ARM::PROLOG_LABEL)).addSym(AfterRegSave);
@@ -333,9 +325,8 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
         // CFA offset needs to be updated if it is relative to the SP (which as
         // just moved). Otherwise it is relative to FP, which has not changed.
         TotalCfaAdjust += DPRCSSize;
-        MachineLocation dst(MachineLocation::VirtualFP);
-        MachineLocation src(MachineLocation::VirtualFP, -TotalCfaAdjust);
-        MMI.getFrameMoves().push_back(MachineMove(AfterRegSave, dst, src));
+        MMI.addFrameInst(MCCFIInstruction::createDefCfaOffset(
+                             AfterRegSave, -TotalCfaAdjust));
       }
       // for each callee saved register record where it has been saved
       int offset = -GPRCS1Size;
@@ -351,14 +342,13 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
           case ARM::D14:
           case ARM::D15:
             offset -= 8;
-            MachineLocation dst(MachineLocation::VirtualFP, offset);
-            MachineLocation src(Reg);
-            MMI.getFrameMoves().push_back(MachineMove(AfterRegSave, dst, src));
+            unsigned DwarfReg = RegInfo->getDwarfRegNum(Reg, true);
+            MMI.addFrameInst(MCCFIInstruction::createOffset(
+                                 AfterRegSave, DwarfReg, offset));
             break;
         }
       }
     }
-#endif
     // @LOCALMOD-END
   }
 
@@ -393,7 +383,6 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
       AFI->setShouldRestoreSPFromFP(true);
 
     // @LOCALMOD-START
-#if 0
     // CFA offset needs to be updated if it is relative to the SP (which as
     // just moved). Otherwise it is relative to FP, which has not changed.
     if (needsFrameMoves && !HasFP) {
@@ -401,11 +390,9 @@ void ARMFrameLowering::emitPrologue(MachineFunction &MF) const {
       MCSymbol *AfterStackUpdate = MMI.getContext().CreateTempSymbol();
       BuildMI(MBB, MBBI, dl,
               TII.get(ARM::PROLOG_LABEL)).addSym(AfterStackUpdate);
-      MachineLocation dst(MachineLocation::VirtualFP);
-      MachineLocation src(MachineLocation::VirtualFP, -TotalCfaAdjust);
-      MMI.getFrameMoves().push_back(MachineMove(AfterStackUpdate, dst, src));
+      MMI.addFrameInst(MCCFIInstruction::createDefCfaOffset(
+                           AfterStackUpdate, -TotalCfaAdjust));
     }
-#endif
     // @LOCALMOD-END
   }
 
