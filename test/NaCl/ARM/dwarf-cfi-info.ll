@@ -68,7 +68,9 @@ define void @dynamic_alloca(i32 %size) {
 }
 ; CHECK: dynamic_alloca:
 ; CHECK: push {r4, r5, r6, r7, r11, lr}
+; CHECK: add r11, sp, #16
+; This ordering isn't quite right, but allow it for now.
+; It will work for C++ exceptions because they aren't asynchronous.
 ; CHECK: .cfi_def_cfa_offset 24
 ; Move .cfi_offset decls, elided...
-; CHECK: add r11, sp, #16
 ; CHECK: .cfi_def_cfa r11, 8
