@@ -322,10 +322,9 @@ static bool Execute(ProcessInfo &PI, StringRef Program, const char **args,
 
 namespace llvm {
 
-#if !defined(__native_client__)
 ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
                       bool WaitUntilTerminates, std::string *ErrMsg) {
-#ifdef HAVE_SYS_WAIT_H
+#if defined(HAVE_SYS_WAIT_H) && !defined(__native_client__)
   struct sigaction Act, Old;
   assert(PI.Pid && "invalid pid to wait on, process not started?");
 
@@ -419,11 +418,11 @@ ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
 #else
   if (ErrMsg)
     *ErrMsg = "Program::Wait is not implemented on this platform yet!";
+  ProcessInfo WaitResult;
   WaitResult.ReturnCode = -2;
 #endif
   return WaitResult;
 }
-#endif
 
 error_code sys::ChangeStdinToBinary(){
   // Do nothing, as Unix doesn't differentiate between text and binary.
