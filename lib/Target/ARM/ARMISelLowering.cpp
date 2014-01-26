@@ -2971,7 +2971,7 @@ ARMTargetLowering::computeRegArea(CCState &CCInfo, MachineFunction &MF,
   ArgRegsSize = NumGPRs * 4;
 
   // If parameter is split between stack and GPRs...
-  if (NumGPRs && Align == 8 &&
+  if (NumGPRs && Align >= 8 &&
       (ArgRegsSize < ArgSize ||
         InRegsParamRecordIdx >= CCInfo.getInRegsParamsCount())) {
     // Add padding for part of param recovered from GPRs, so
