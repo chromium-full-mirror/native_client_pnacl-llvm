@@ -33,15 +33,18 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/StreamableMemoryObject.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/NaCl.h"
+#include "ThreadedStreamingCache.h"
 #include <pthread.h>
 #include <memory>
 
@@ -53,8 +56,9 @@ using namespace llvm;
 // it uses SRPC operations instead of direct OS intefaces.
 #if defined(__native_client__)
 int srpc_main(int argc, char **argv);
-int getObjectFileFD();
+int getObjectFileFD(unsigned index);
 DataStreamer *getNaClBitcodeStreamer();
+
 fatal_error_handler_t getSRPCErrorHandler();
 #endif
 
@@ -135,6 +139,7 @@ SplitModuleCount("split-module",
 /// option parsing.
 static int compileModule(StringRef ProgramName);
 
+#if !defined(__native_client__)
 // GetFileNameRoot - Helper function to get the basename of a filename.
 static std::string
 GetFileNameRoot(StringRef InputFilename) {
@@ -212,6 +217,7 @@ static tool_output_file *GetOutputStream(const char *TargetName,
 
   return FDOut.take();
 }
+#endif // !defined(__native_client__)
 
 // main - Entry point for the llc compiler.
 //
@@ -281,7 +287,8 @@ static void CheckABIVerifyErrors(PNaClABIErrorReporter &Reporter,
   Reporter.reset();
 }
 
-static Module* getModule(StringRef ProgramName, LLVMContext &Context) {
+static Module* getModule(StringRef ProgramName, LLVMContext &Context,
+                         StreamingMemoryObject *StreamingObject) {
   Module *M = 0;
   SMDiagnostic Err;
 #if defined(__native_client__)
@@ -290,22 +297,18 @@ static Module* getModule(StringRef ProgramName, LLVMContext &Context) {
     std::string DisplayFilename("<PNaCl-translated pexe>");
     M = getNaClStreamedBitcodeModule(
         DisplayFilename,
-        getNaClBitcodeStreamer(), Context, &StrError);
+        new ThreadedStreamingCache(StreamingObject), Context, &StrError);
     if (!StrError.empty())
       Err = SMDiagnostic(DisplayFilename, SourceMgr::DK_Error, StrError);
   } else {
     llvm_unreachable("native client SRPC only supports streaming");
   }
 #else
-  DataStreamer *FileStreamer;
   if (LazyBitcode) {
     std::string StrError;
-    FileStreamer = getDataFileStreamer(InputFilename, &StrError);
-    if (FileStreamer) {
-      M = getNaClStreamedBitcodeModule(
+    M = getNaClStreamedBitcodeModule(
         InputFilename,
-        FileStreamer, Context, &StrError);
-    }
+        new ThreadedStreamingCache(StreamingObject), Context, &StrError);
     if (!StrError.empty())
       Err = SMDiagnostic(InputFilename, SourceMgr::DK_Error, StrError);
   } else {
@@ -441,20 +444,20 @@ static int runCompilePasses(Module *mod,
 
 
 static int compileSplitModule(const TargetOptions &Options,
-                            const Triple &TheTriple,
-                            const Target *TheTarget,
-                            const std::string &FeaturesStr,
-                            CodeGenOpt::Level OLvl,
-                            const StringRef &ProgramName,
-                            Module *GlobalModule,
-                            unsigned ModuleIndex) {
+                              const Triple &TheTriple,
+                              const Target *TheTarget,
+                              const std::string &FeaturesStr,
+                              CodeGenOpt::Level OLvl,
+                              const StringRef &ProgramName,
+                              Module *GlobalModule,
+                              StreamingMemoryObject *StreamingObject,
+                              unsigned ModuleIndex) {
   std::auto_ptr<TargetMachine>
     target(TheTarget->createTargetMachine(TheTriple.getTriple(),
                                           MCPU, FeaturesStr, Options,
                                           RelocModel, CMModel, OLvl));
   assert(target.get() && "Could not allocate target machine!");
   TargetMachine &Target = *target.get();
-
   // Override default to generate verbose assembly.
   Target.setAsmVerbosityDefault(true);
   if (RelaxAll) {
@@ -473,7 +476,7 @@ static int compileSplitModule(const TargetOptions &Options,
     mod = GlobalModule;
   } else {
     C.reset(new LLVMContext());
-    mod = getModule(ProgramName, *C);
+    mod = getModule(ProgramName, *C, StreamingObject);
     if (!mod)
       return 1;
     M.reset(mod);
@@ -493,7 +496,7 @@ static int compileSplitModule(const TargetOptions &Options,
     if (!Out) return 1;
     formatted_raw_ostream FOS(Out->os());
 #else
-    raw_fd_ostream ROS(getObjectFileFD(), true);
+    raw_fd_ostream ROS(getObjectFileFD(ModuleIndex), true);
     ROS.SetBufferSize(1 << 20);
     formatted_raw_ostream FOS(ROS);
 #endif
@@ -520,6 +523,7 @@ struct ThreadData {
   CodeGenOpt::Level OLvl;
   std::string ProgramName;
   Module *GlobalModule;
+  StreamingMemoryObject *StreamingObject;
   unsigned ModuleIndex;
 };
 
@@ -527,13 +531,14 @@ struct ThreadData {
 static void *runCompileThread(void *arg) {
   struct ThreadData *Data = static_cast<ThreadData *>(arg);
   int ret = compileSplitModule(*Data->Options,
-                             *Data->TheTriple,
-                             Data->TheTarget,
-                             Data->FeaturesStr,
-                             Data->OLvl,
-                             Data->ProgramName,
-                             Data->GlobalModule,
-                             Data->ModuleIndex);
+                               *Data->TheTriple,
+                               Data->TheTarget,
+                               Data->FeaturesStr,
+                               Data->OLvl,
+                               Data->ProgramName,
+                               Data->GlobalModule,
+                               Data->StreamingObject,
+                               Data->ModuleIndex);
   return reinterpret_cast<void *>(static_cast<intptr_t>(ret));
 }
 
@@ -548,12 +553,26 @@ static int compileModule(StringRef ProgramName) {
   OwningPtr<Module> mod;
   Triple TheTriple;
   PNaClABIErrorReporter ABIErrorReporter;
-
-
+  OwningPtr<StreamingMemoryObject> StreamingObject;
 
   if (!MainContext) return 1;
 
-  mod.reset(getModule(ProgramName, *MainContext.get()));
+#if defined(__native_client__)
+  StreamingObject.reset(new StreamingMemoryObject(getNaClBitcodeStreamer()));
+#else
+  if (LazyBitcode) {
+    std::string StrError;
+    DataStreamer* FileStreamer(getDataFileStreamer(InputFilename, &StrError));
+    if (!StrError.empty()) {
+      SMDiagnostic Err(InputFilename, SourceMgr::DK_Error, StrError);
+      Err.print(ProgramName.data(), errs());
+    }
+    if (!FileStreamer)
+      return 1;
+    StreamingObject.reset(new StreamingMemoryObject(FileStreamer));
+  }
+#endif
+  mod.reset(getModule(ProgramName, *MainContext.get(), StreamingObject.get()));
 
   if (!mod) return 1;
 
@@ -631,7 +650,7 @@ static int compileModule(StringRef ProgramName) {
 
   if (SplitModuleCount == 1) {
     return compileSplitModule(Options, TheTriple, TheTarget, FeaturesStr,
-                              OLvl, ProgramName, mod.get(), 0);
+                              OLvl, ProgramName, mod.get(), NULL, 0);
   }
 
   for(unsigned ModuleIndex = 0; ModuleIndex < SplitModuleCount; ++ModuleIndex) {
@@ -642,6 +661,7 @@ static int compileModule(StringRef ProgramName) {
     ThreadDatas[ModuleIndex].OLvl = OLvl;
     ThreadDatas[ModuleIndex].ProgramName = ProgramName.str();
     ThreadDatas[ModuleIndex].GlobalModule = mod.get();
+    ThreadDatas[ModuleIndex].StreamingObject = StreamingObject.get();
     ThreadDatas[ModuleIndex].ModuleIndex = ModuleIndex;
     if (pthread_create(&Pthreads[ModuleIndex], NULL, runCompileThread,
                         &ThreadDatas[ModuleIndex])) {
