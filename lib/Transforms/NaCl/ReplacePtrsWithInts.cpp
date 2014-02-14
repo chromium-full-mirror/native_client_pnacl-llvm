@@ -585,6 +585,8 @@ bool ReplacePtrsWithInts::runOnModule(Module &M) {
       NewArg->takeName(Arg);
     }
 
+    // invariant.end calls refer to invariant.start calls, so we must
+    // remove the former first.
     for (Function::iterator BB = NewFunc->begin(), E = NewFunc->end();
          BB != E; ++BB) {
       for (BasicBlock::iterator Iter = BB->begin(), E = BB->end();
