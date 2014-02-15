@@ -82,6 +82,7 @@ static void CheckAttributes(AttributeSet Attrs) {
         // The following attributes are just hints, which can be
         // safely removed.
         case Attribute::AlwaysInline:
+        case Attribute::Cold:
         case Attribute::InlineHint:
         case Attribute::MinSize:
         case Attribute::NoAlias:
@@ -94,6 +95,8 @@ static void CheckAttributes(AttributeSet Attrs) {
         case Attribute::OptimizeForSize:
         case Attribute::ReadNone:
         case Attribute::ReadOnly:
+
+        case Attribute::Builtin:
 
         // PNaCl does not support -fstack-protector in the translator.
         case Attribute::StackProtect:
