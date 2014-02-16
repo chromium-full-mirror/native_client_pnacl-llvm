@@ -83,9 +83,6 @@ namespace {
                                const GlobalStatus &GS);
     bool OptimizeEmptyGlobalCXXDtors(Function *CXAAtExitFn);
 
-    // @LOCALMOD: see usage below
-    bool IsUserEntryPointMain(const Function *Func);
-
     DataLayout *TD;
     TargetLibraryInfo *TLI;
   };
@@ -1729,17 +1726,6 @@ bool GlobalOpt::ProcessGlobal(GlobalVariable *GV,
     return false;
 
   return ProcessInternalGlobal(GV, GVI, GS);
-}
-
-bool GlobalOpt::IsUserEntryPointMain(const Function *Func) {    // @LOCALMOD
-  if (Func->hasOneUse() && Func->getName() == "main") {
-    const User *FuncUser = Func->use_back();
-    if (const CallInst *CallUser = dyn_cast<CallInst>(FuncUser)) {
-      const Function *Caller = CallUser->getParent()->getParent();
-      return Caller->getName() == "_start";
-    }
-  }
-  return false;
 }
 
 /// ProcessInternalGlobal - Analyze the specified global variable and optimize
