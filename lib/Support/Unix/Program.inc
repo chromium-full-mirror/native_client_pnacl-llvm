@@ -324,7 +324,9 @@ namespace llvm {
 
 ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
                       bool WaitUntilTerminates, std::string *ErrMsg) {
+  // @LOCALMOD-BEGIN
 #if defined(HAVE_SYS_WAIT_H) && !defined(__native_client__)
+  // @LOCALMOD-END
   struct sigaction Act, Old;
   assert(PI.Pid && "invalid pid to wait on, process not started?");
 
