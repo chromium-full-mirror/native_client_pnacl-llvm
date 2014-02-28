@@ -1500,15 +1500,24 @@ error_code NaClBitcodeReader::Materialize(GlobalValue *GV) {
   assert(DFII != DeferredFunctionInfo.end() && "Deferred function not found!");
   // If its position is recorded as 0, its body is somewhere in the stream
   // but we haven't seen it yet.
-  if (DFII->second == 0)
-    if (FindFunctionInStream(F, DFII))
-      return make_error_code(errc::invalid_argument); // XXX
+  if (DFII->second == 0) {
+    if (FindFunctionInStream(F, DFII)) {
+      // Refactoring upstream in LLVM 3.4 means we can no longer
+      // return an error string here, so return a catch-all error
+      // code.
+      // TODO(mseaborn): Clean up the reader to return a more
+      // meaningful error_code here.
+      return make_error_code(errc::invalid_argument);
+    }
+  }
 
   // Move the bit stream to the saved position of the deferred function body.
   Stream.JumpToBit(DFII->second);
 
   if (ParseFunctionBody(F)) {
-    return make_error_code(errc::invalid_argument); // XXX
+    // TODO(mseaborn): Clean up the reader to return a more meaningful
+    // error_code instead of a catch-all.
+    return make_error_code(errc::invalid_argument);
   }
 
   // Upgrade any old intrinsic calls in the function.
