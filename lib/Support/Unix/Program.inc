@@ -314,7 +314,9 @@ static bool Execute(ProcessInfo &PI, StringRef Program, const char **args,
     default:
       break;
   }
+// @LOCALMOD-BEGIN
 #endif
+// @LOCALMOD-END
 
   PI.Pid = child;
 
@@ -329,8 +331,6 @@ ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
 #if defined(HAVE_SYS_WAIT_H) && !defined(PNACL_BROWSER_TRANSLATOR)
   // @LOCALMOD-END
   struct sigaction Act, Old;
-#endif
-// @LOCALMOD-END
   assert(PI.Pid && "invalid pid to wait on, process not started?");
 
   int WaitPidOptions = 0;
