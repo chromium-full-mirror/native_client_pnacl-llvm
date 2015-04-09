@@ -1,4 +1,4 @@
-;===- ./tools/pnacl-benchmark/LLVMBuild.txt --------------------*- Conf -*--===;
+;===- ./lib/Target/JSBackend/LLVMBuild.txt --------------------*- Conf -*--===;
 ;
 ;                     The LLVM Compiler Infrastructure
 ;
@@ -15,8 +15,17 @@
 ;
 ;===------------------------------------------------------------------------===;
 
+[common]
+subdirectories = MCTargetDesc TargetInfo
+
 [component_0]
-type = Tool
-name = pnacl-benchmark
-parent = Tools
-required_libraries = AsmParser BitReader NaClBitReader IRReader all-targets NaClAnalysis NaClTransforms
+type = TargetGroup
+name = JSBackend
+parent = Target
+
+[component_1]
+type = Library
+name = JSBackendCodeGen
+parent = JSBackend
+required_libraries = Core JSBackendInfo JSBackendDesc Support Target
+add_to_library_groups = JSBackend

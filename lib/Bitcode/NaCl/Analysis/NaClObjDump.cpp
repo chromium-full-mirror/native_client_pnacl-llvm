@@ -589,23 +589,12 @@ public:
   }
 
   /// Generates an error with the given message.
-  bool ErrorAt(uint64_t Bit, const std::string &Message) final {
-    // Use local error routine so that all errors are treated uniformly.
-    ObjDump.Error(Bit) << Message << "\n";
+  bool ErrorAt(naclbitc::ErrorLevel Level, uint64_t Bit,
+               const std::string &Message) final {
+    ObjDump.ErrorAt(Level, Bit) << Message << "\n";
+    if (Level == naclbitc::Fatal)
+      ObjDump.FlushThenQuit();
     return true;
-  }
-
-  /// Flushes out objdump and then exits with fatal error.
-  LLVM_ATTRIBUTE_NORETURN
-  void Fatal() {
-    NaClBitcodeParser::Fatal();
-  }
-
-  /// Flushes out objdump and then exits with fatal error, using
-  /// the given message.
-  LLVM_ATTRIBUTE_NORETURN
-  void FatalAt(uint64_t Bit, const std::string &Message) final {
-    ObjDump.Fatal(Bit, Message);
   }
 
   /// Parses the top-level module block.
@@ -1365,12 +1354,9 @@ protected:
     return Context->Warnings();
   }
 
-  void Fatal() {
-    return Context->Fatal();
-  }
-
-  void FatalAt(uint64_t Bit, const std::string &Message) override {
-    return Context->FatalAt(Bit, Message);
+  bool ErrorAt(naclbitc::ErrorLevel Level, uint64_t Bit,
+               const std::string &Message) final {
+    return Context->ErrorAt(Level, Bit, Message);
   }
 
   const std::string &GetAssemblyIndent() const {
@@ -3532,19 +3518,19 @@ bool NaClDisTopLevelParser::ParseBlock(unsigned BlockID) {
 
 namespace llvm {
 
-bool NaClObjDump(MemoryBuffer *MemBuf, raw_ostream &Output,
+bool NaClObjDump(MemoryBufferRef MemBuf, raw_ostream &Output,
                  bool NoRecords, bool NoAssembly) {
   // Create objects needed to run parser.
   naclbitc::ObjDumpStream ObjDump(Output, !NoRecords, !NoAssembly);
 
-  if (MemBuf->getBufferSize() % 4 != 0) {
+  if (MemBuf.getBufferSize() % 4 != 0) {
     ObjDump.Error()
         << "Bitcode stream should be a multiple of 4 bytes in length.\n";
     return true;
   }
 
-  const unsigned char *BufPtr = (const unsigned char *)MemBuf->getBufferStart();
-  const unsigned char *EndBufPtr = BufPtr+MemBuf->getBufferSize();
+  const unsigned char *BufPtr = (const unsigned char *)MemBuf.getBufferStart();
+  const unsigned char *EndBufPtr = BufPtr+MemBuf.getBufferSize();
   const unsigned char *HeaderPtr = BufPtr;
 
   // Read header and verify it is good.

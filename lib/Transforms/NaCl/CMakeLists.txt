@@ -2,6 +2,7 @@ add_llvm_library(LLVMNaClTransforms
   AddPNaClExternalDecls.cpp
   BackendCanonicalize.cpp
   CanonicalizeMemIntrinsics.cpp
+  CleanupUsedGlobalsMetadata.cpp
   ConstantInsertExtractElementIndex.cpp
   ExceptionInfoWriter.cpp
   ExpandArithWithOverflow.cpp
@@ -23,6 +24,8 @@ add_llvm_library(LLVMNaClTransforms
   GlobalCleanup.cpp
   GlobalizeConstantVectors.cpp
   InsertDivideCheck.cpp
+  InternalizeUsedGlobals.cpp
+  NormalizeAlignment.cpp
   PNaClABISimplify.cpp
   PNaClSjLjEH.cpp
   PromoteI1Ops.cpp
@@ -34,8 +37,17 @@ add_llvm_library(LLVMNaClTransforms
   RewriteLLVMIntrinsics.cpp
   RewritePNaClLibraryCalls.cpp
   SimplifyAllocas.cpp
+  SimplifyStructRegSignatures.cpp
   StripAttributes.cpp
   StripMetadata.cpp
+  # Emscripten files:
+  ExpandI64.cpp
+  ExpandInsertExtractElement.cpp
+  LowerEmAsyncify.cpp
+  LowerEmExceptionsPass.cpp
+  LowerEmSetjmp.cpp
+  NoExitRuntime.cpp
+  # Emscripten files end.
   )
 
 add_dependencies(LLVMNaClTransforms intrinsics_gen)
