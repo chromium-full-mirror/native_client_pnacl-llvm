@@ -38,7 +38,12 @@ int helpMain(int argc, const char *argv[]) {
   return 0;
 }
 
+#if defined(__native_client__)
+int main(int argc, char **argvc) {
+  const char **argv = (const char **) argvc;
+#else
 int main(int argc, const char **argv) {
+#endif
   // If argv[0] is or ends with 'gcov', always be gcov compatible
   if (sys::path::stem(argv[0]).endswith_lower("gcov"))
     return gcovMain(argc, argv);

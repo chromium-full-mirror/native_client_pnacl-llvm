@@ -277,7 +277,7 @@ void CrashRecoveryContext::Enable() {
 
   gCrashRecoveryEnabled = true;
 
-#if !defined(__native_client__) // @LOCALMOD
+#if !defined(PNACL_BROWSER_TRANSLATOR) // @LOCALMOD
   // Setup the signal handler.
   struct sigaction Handler;
   Handler.sa_handler = CrashRecoverySignalHandler;

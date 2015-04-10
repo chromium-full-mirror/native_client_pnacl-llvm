@@ -440,7 +440,12 @@ static void dumpInput(StringRef File) {
     reportError(File, vtabledump_error::unrecognized_file_format);
 }
 
+#if defined(__native_client__)
+int main(int argc, char *argvc[]) {
+  const char **argv = (const char **) argvc;
+#else
 int main(int argc, const char *argv[]) {
+#endif
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);
   llvm_shutdown_obj Y;
