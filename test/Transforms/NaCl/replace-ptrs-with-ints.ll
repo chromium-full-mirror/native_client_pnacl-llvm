@@ -610,19 +610,7 @@ define void @typeid_for() {
 ; CHECK-NEXT: call i32 @llvm.eh.typeid.for(i8* %typeid.bc)
 
 
-; Subprogram debug metadata may refer to a function.
-; Make sure those are updated too.
-; Regenerate the debug info from the following C program:
-; void nop(void *ptr) {
-; }
 
-define void @nop(i8* %ptr) {
-  tail call void @llvm.dbg.value(metadata i8* %ptr, i64 0, metadata !11, metadata !12), !dbg !19
-  ret void, !dbg !19
-}
-; CHECK: define void @nop(i32 %ptr) {
-; CHECK-NEXT: call void @llvm.dbg.value{{.*}}
-; CHECK-NEXT: ret void
 
 
 ; CHECK: attributes {{.*}}[[NOUNWIND]] = { nounwind }
@@ -630,6 +618,13 @@ define void @nop(i8* %ptr) {
 !llvm.dbg.cu = !{!0}
 !llvm.module.flags = !{!8, !9}
 !llvm.ident = !{!10}
+
+; Subprogram debug metadata may refer to a function.
+; Make sure those are updated too. The @debug_declare test case was abstracted
+; from the IR of the following program:
+; void debug_declare(int val) {
+;   int var[val];
+; }
 
 ; CHECK: !4 = !MDSubprogram(name: "debug_declare", scope: !1, file: !1, line: 1, type: !5, isLocal: false, isDefinition: true, scopeLine: 1, flags: DIFlagPrototyped, isOptimized: false, function: void (i32)* @debug_declare, variables: !2)
 

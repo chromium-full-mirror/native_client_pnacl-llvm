@@ -158,7 +158,7 @@ void ConstantInsertExtractElementIndex::fixNonConstantVectorIndices(
 bool ConstantInsertExtractElementIndex::runOnBasicBlock(BasicBlock &BB) {
   bool Changed = false;
   if (!DL)
-    DL = &BB.getParent()->getParent()->getDataLayout();
+    DL = &BB.getModule()->getDataLayout();
   Instructions OutOfRangeConstantIndices;
   Instructions NonConstantVectorIndices;
 

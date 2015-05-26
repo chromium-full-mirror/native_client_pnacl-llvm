@@ -1831,7 +1831,7 @@ std::error_code NaClBitcodeReader::MaterializeModule(Module *M) {
 }
 
 std::vector<StructType *> NaClBitcodeReader::getIdentifiedStructTypes() const {
-  // MERGETODO(dschuff): does this need to contain anything for TypeFinder?
+  // PNaCl bitcode has no struct types.
   return std::vector<StructType *>();
 }
 

@@ -357,10 +357,8 @@ private:
 /// NaClBitcodeDist.  By default, only the number of instances
 /// of the corresponding distribution values is recorded.
 class NaClBitcodeDistElement {
-  NaClBitcodeDistElement(const NaClBitcodeDistElement &)
-      = delete;
-  void operator=(const NaClBitcodeDistElement &)
-      = delete;
+  NaClBitcodeDistElement(const NaClBitcodeDistElement &) = delete;
+  void operator=(const NaClBitcodeDistElement &) = delete;
 
 public:
   /// Define kinds for isa, dyn_cast, etc. support. Only defined

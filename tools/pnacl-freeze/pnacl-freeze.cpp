@@ -77,9 +77,7 @@ int main(int argc, char **argv) {
         getStreamedBitcodeModule(DisplayFilename, Buffer.release(), Context);
     M = std::move(*MOrErr);
     M->materializeAllPermanently();
-  }
-
-  if (!M.get()) {
+  } else {
     errs() << argv[0] << ": ";
     if (ErrorMessage.size())
       errs() << ErrorMessage << "\n";

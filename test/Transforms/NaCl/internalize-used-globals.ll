@@ -29,6 +29,3 @@ define internal void @my_internal() {
 ; Internals are left as-is.
 ; CHECK-LABEL: define internal void @my_internal()
 
-!llvm.ident = !{!0}
-!0 = !{!"clang version 3.5.0 "}
-

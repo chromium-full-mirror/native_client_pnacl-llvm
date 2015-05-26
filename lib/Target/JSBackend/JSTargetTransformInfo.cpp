@@ -1,4 +1,4 @@
-//===-- JSTargetTransformInfo.cpp - JS specific TTI  ------------*- C++ -*-===//
+//===-- JSTargetTransformInfo.cpp - JS specific TTI  ----------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //

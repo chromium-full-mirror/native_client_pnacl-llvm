@@ -248,7 +248,7 @@ void FixVectorLoadStoreAlignment::scalarizeVectorLoadStore(
 bool FixVectorLoadStoreAlignment::runOnBasicBlock(BasicBlock &BB) {
   bool Changed = false;
   if (!DL)
-    DL = &BB.getParent()->getParent()->getDataLayout();
+    DL = &BB.getModule()->getDataLayout();
   Instructions Loads;
   Instructions Stores;
   visitVectorLoadStore(BB, Loads, Stores);

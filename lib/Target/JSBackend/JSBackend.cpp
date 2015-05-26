@@ -154,7 +154,7 @@ namespace {
     bool UsesSIMD;
     int InvokeState; // cycles between 0, 1 after preInvoke, 2 after call, 0 again after postInvoke. hackish, no argument there.
     CodeGenOpt::Level OptLevel;
-   const DataLayout *DL;
+    const DataLayout *DL;
     bool StackBumped;
 
     #include "CallHandlers.h"
